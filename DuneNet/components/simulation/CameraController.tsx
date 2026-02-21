@@ -35,6 +35,7 @@ export default function CameraController({
   const orbitAngle = useRef(0);
   const initialised = useRef(false);
   const currentFov = useRef(fov);
+  const jitterClock = useRef(0);
 
   // Snap camera on mount
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function CameraController({
 
   useFrame((_, delta) => {
     if (!initialised.current) return;
+    jitterClock.current += delta;
 
     const t = new THREE.Vector3(...robotState.position);
     const rot = robotState.rotation;
@@ -58,6 +60,12 @@ export default function CameraController({
       camera.fov = currentFov.current;
       camera.updateProjectionMatrix();
     }
+
+    const jitter = new THREE.Vector3(
+      Math.sin(jitterClock.current * 0.7) * 0.12,
+      Math.sin(jitterClock.current * 1.1) * 0.08,
+      Math.cos(jitterClock.current * 0.9) * 0.12,
+    );
 
     if (cameraMode === 'fpv') {
       // First person — camera at the rover's camera mast position
@@ -83,7 +91,7 @@ export default function CameraController({
         t.z + forwardZ * lookAhead,
       );
 
-      camera.position.lerp(eyePos, damping * 5);
+      camera.position.lerp(eyePos.add(jitter.multiplyScalar(0.6)), damping * 5);
       targetVec.current.lerp(lookTarget, damping * 4);
       camera.lookAt(targetVec.current);
     } else if (cameraMode === 'orbit') {
@@ -95,7 +103,7 @@ export default function CameraController({
         targetVec.current.y + followHeight,
         targetVec.current.z + Math.sin(orbitAngle.current) * radius,
       );
-      camera.position.lerp(desiredPos, damping * 2);
+      camera.position.lerp(desiredPos.add(jitter), damping * 2);
       camera.lookAt(targetVec.current);
     } else {
       // Follow mode
@@ -110,7 +118,7 @@ export default function CameraController({
         targetVec.current.y + followHeight,
         targetVec.current.z + behindZ,
       );
-      camera.position.lerp(desiredPos, damping * 2);
+      camera.position.lerp(desiredPos.add(jitter), damping * 2);
       camera.lookAt(targetVec.current);
     }
   });

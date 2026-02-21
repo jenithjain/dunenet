@@ -38,15 +38,18 @@ import {
 import { createNoise2D } from 'simplex-noise';import { robotState } from './robotState';
 // ── Terrain height helper (must match Terrain.tsx noise) ──
 const terrainNoise = createNoise2D(() => 0.5);
-function getTerrainHeight(wx: number, wz: number, worldSize: number = 200): number {
+function getTerrainHeight(wx: number, wz: number, worldSize: number = 320): number {
   let h = 0;
-  h += terrainNoise(wx * 0.006, wz * 0.006) * 10;
-  h += terrainNoise(wx * 0.015, wz * 0.015) * 4;
-  h += terrainNoise(wx * 0.04, wz * 0.04) * 1.5;
-  h += terrainNoise(wx * 0.1,  wz * 0.1)  * 0.4;
-  h += terrainNoise(wx * 0.25, wz * 0.25) * 0.1;
+  h += terrainNoise(wx * 0.0025, wz * 0.0025) * 2.2;
+  h += terrainNoise(wx * 0.008, wz * 0.008) * 1.1;
+  h += terrainNoise(wx * 0.03, wz * 0.03) * 0.6;
+  h += terrainNoise(wx * 0.12, wz * 0.12) * 0.22;
+
+  const slope = (wz / (worldSize * 0.5)) * 1.4;
+  h += slope;
+
   const d = Math.sqrt(wx * wx + wz * wz) / (worldSize * 0.5);
-  h *= Math.max(0, 1 - d * d * d);
+  h *= Math.max(0, 1 - d * d * 0.55);
   return h;
 }
 
@@ -185,8 +188,8 @@ export interface SimulationSceneProps {
 }
 
 export default function SimulationScene({ className }: SimulationSceneProps) {
-  const WORLD_SIZE = 200;
-  const GRID_SIZE = 128; // Use 128 for performance, looks great
+  const WORLD_SIZE = 320;
+  const GRID_SIZE = 128; // Keep 128 for performance
 
   // State
   const [costmap, setCostmap] = useState<CostmapData | null>(null);
@@ -225,6 +228,13 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     () => sunPositionFromAngles(settings.sunAzimuth, settings.sunElevation),
     [settings.sunAzimuth, settings.sunElevation],
   );
+
+  const dustStormStrength = useMemo(() => {
+    const opacityFactor = Math.pow(Math.min(1, settings.dustOpacity / 0.85), 1.2);
+    const fogFactor = Math.pow(Math.min(1, settings.fogDensity / 0.02), 1.4);
+    const countFactor = Math.min(1, settings.dustCount / 6000);
+    return 0.5 + opacityFactor * 1.9 + fogFactor * 1.4 + countFactor * 0.7;
+  }, [settings.dustOpacity, settings.dustCount, settings.fogDensity]);
 
   // Goal position in grid coords
   const [goalGrid, setGoalGrid] = useState<PathPoint>({ x: GRID_SIZE - 20, y: GRID_SIZE - 20 });
@@ -308,6 +318,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     }
 
     const canvas = gl.domElement;
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const onContextLost = (e: Event) => {
       e.preventDefault();
@@ -370,13 +382,13 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.98,
+          toneMappingExposure: 1.3,
           outputColorSpace: THREE.SRGBColorSpace,
           physicallyCorrectLights: true,
           powerPreference: 'default',
           failIfMajorPerformanceCaveat: false,
         }}
-        camera={{ fov: 50, near: 0.1, far: 1000, position: [20, 15, 20] }}
+        camera={{ fov: settings.cameraFov, near: 0.1, far: 1200, position: [26, 12, 26] }}
         dpr={[1, 1.35]}
         style={{ background: '#87CEEB' }}
         onCreated={handleCanvasCreated}
@@ -400,7 +412,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         {/* Terrain */}
         <Terrain
           size={WORLD_SIZE}
-          segments={GRID_SIZE}
+          segments={settings.terrainSegments}
           costmapData={costmap?.data ?? null}
           costmapWidth={GRID_SIZE}
           costmapHeight={GRID_SIZE}
@@ -457,6 +469,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           count={settings.dustCount}
           opacity={settings.dustOpacity}
           size={settings.dustSize}
+          windStrength={0.6 + dustStormStrength * 0.55}
+          stormStrength={dustStormStrength}
         />
 
         {/* Camera */}

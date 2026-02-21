@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useMemo } from 'react';
+import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 
@@ -15,7 +16,7 @@ interface TerrainProps {
 }
 
 export default function Terrain({
-  size = 200,
+  size = 320,
   segments = 256,
   costmapData = null,
   costmapWidth = 256,
@@ -34,37 +35,44 @@ export default function Terrain({
 
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
-    const warmSand = new THREE.Color('#c7a374');
-    const brightSand = new THREE.Color('#e1c598');
-    const claySoil = new THREE.Color('#8f6b49');
-    const dryGrassTint = new THREE.Color('#9f8d58');
+    const warmSand = new THREE.Color('#c8a071');
+    const brightSand = new THREE.Color('#e3c49b');
+    const claySoil = new THREE.Color('#875a3c');
+    const dryGrassTint = new THREE.Color('#b39a63');
+    const stoneTint = new THREE.Color('#9d7a58');
     const color = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
 
-      // Multi-octave noise → realistic dunes
+      // Multi-octave noise → semi-arid rolling hills
       let h = 0;
-      h += noise2D(x * 0.006, z * 0.006) * 10; // broad dunes
-      h += noise2D(x * 0.015, z * 0.015) * 4; // medium ridges
-      h += noise2D(x * 0.04, z * 0.04) * 1.5; // ripples
-      h += noise2D(x * 0.1, z * 0.1) * 0.4; // fine grain
-      h += noise2D(x * 0.25, z * 0.25) * 0.1; // micro
+      h += noise2D(x * 0.0025, z * 0.0025) * 2.2; // broad hills
+      h += noise2D(x * 0.008, z * 0.008) * 1.1; // medium bumps
+      h += noise2D(x * 0.03, z * 0.03) * 0.6; // small ripples
+      h += noise2D(x * 0.12, z * 0.12) * 0.22; // micro
 
-      // Edge falloff
+      // Directional slope (subtle hillside)
+      const slope = (z / (size * 0.5)) * 1.4;
+      h += slope;
+
+      // Soft edge falloff
       const d = Math.sqrt(x * x + z * z) / (size * 0.5);
-      h *= Math.max(0, 1 - d * d * d);
+      h *= Math.max(0, 1 - d * d * 0.55);
 
       pos.setY(i, h);
 
       const soilNoise = tintNoise(x * 0.03, z * 0.03) * 0.5 + 0.5;
-      const patchNoise = tintNoise(x * 0.07 + 11.7, z * 0.07 - 8.2) * 0.5 + 0.5;
-      const grassMask = THREE.MathUtils.smoothstep(patchNoise, 0.56, 0.78) * THREE.MathUtils.smoothstep(h, -1.5, 5);
+      const patchNoise = tintNoise(x * 0.095 + 11.7, z * 0.095 - 8.2) * 0.5 + 0.5;
+      const stoneNoise = tintNoise(x * 0.15 + 4.1, z * 0.15 + 2.7) * 0.5 + 0.5;
+      const grassMask = THREE.MathUtils.smoothstep(patchNoise, 0.55, 0.82) * THREE.MathUtils.smoothstep(h, -1.2, 3.8);
+      const stoneMask = THREE.MathUtils.smoothstep(stoneNoise, 0.62, 0.9) * 0.38;
 
-      color.copy(warmSand).lerp(brightSand, soilNoise * 0.45);
-      color.lerp(claySoil, THREE.MathUtils.smoothstep(soilNoise, 0.75, 1.0) * 0.5);
-      color.lerp(dryGrassTint, grassMask * 0.35);
+      color.copy(warmSand).lerp(brightSand, soilNoise * 0.5);
+      color.lerp(claySoil, THREE.MathUtils.smoothstep(soilNoise, 0.7, 1.0) * 0.55);
+      color.lerp(dryGrassTint, grassMask * 0.5);
+      color.lerp(stoneTint, stoneMask);
 
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
@@ -77,117 +85,142 @@ export default function Terrain({
     return geo;
   }, [size, segments]);
 
-  // ── Procedural PBR sand material ──
+  const textures = useTexture({
+    dirtColor: '/textures/terrain/ground103/Ground103_2K-JPG_Color.jpg',
+    dirtNormal: '/textures/terrain/ground103/Ground103_2K-JPG_NormalGL.jpg',
+    dirtRough: '/textures/terrain/ground103/Ground103_2K-JPG_Roughness.jpg',
+    dirtAO: '/textures/terrain/ground103/Ground103_2K-JPG_AmbientOcclusion.jpg',
+    greenColor: '/textures/terrain/ground102/Ground102_2K-JPG_Color.jpg',
+    greenNormal: '/textures/terrain/ground102/Ground102_2K-JPG_NormalGL.jpg',
+    greenRough: '/textures/terrain/ground102/Ground102_2K-JPG_Roughness.jpg',
+    greenAO: '/textures/terrain/ground102/Ground102_2K-JPG_AmbientOcclusion.jpg',
+    grassColor: '/textures/terrain/grass005/Grass005_2K-JPG_Color.jpg',
+    grassNormal: '/textures/terrain/grass005/Grass005_2K-JPG_NormalGL.jpg',
+    grassRough: '/textures/terrain/grass005/Grass005_2K-JPG_Roughness.jpg',
+    grassAO: '/textures/terrain/grass005/Grass005_2K-JPG_AmbientOcclusion.jpg',
+  });
+
   const sandMaterial = useMemo(() => {
-    // --- diffuse (color) ---
-    const TEX = 1024;
-    const dc = document.createElement('canvas');
-    dc.width = TEX;
-    dc.height = TEX;
-    const dctx = dc.getContext('2d')!;
-    const dn = createNoise2D(() => 0.3);
-
-    for (let y = 0; y < TEX; y++) {
-      for (let x = 0; x < TEX; x++) {
-        const u = x / TEX;
-        const v = y / TEX;
-        const n1 = dn(u * 50, v * 50) * 0.5 + 0.5;
-        const n2 = dn(u * 110, v * 110) * 0.5 + 0.5;
-        const n3 = dn(u * 250, v * 250) * 0.5 + 0.5;
-        const c = n1 * 0.45 + n2 * 0.35 + n3 * 0.2;
-
-        const r = Math.floor(173 + c * 62);
-        const g = Math.floor(138 + c * 50);
-        const b = Math.floor(90 + c * 38);
-        dctx.fillStyle = `rgb(${r},${g},${b})`;
-        dctx.fillRect(x, y, 1, 1);
+    const blendNoise = (() => {
+      const size = 512;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d')!;
+      const n1 = createNoise2D(() => 0.35);
+      const n2 = createNoise2D(() => 0.85);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const u = x / size;
+          const v = y / size;
+          const a = n1(u * 6, v * 6) * 0.5 + 0.5;
+          const b = n2(u * 18, v * 18) * 0.5 + 0.5;
+          const mix = a * 0.65 + b * 0.35;
+          const g = Math.floor(90 + mix * 140);
+          ctx.fillStyle = `rgb(${g},${g},${g})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
       }
-    }
-    const diffuse = new THREE.CanvasTexture(dc);
-    diffuse.wrapS = diffuse.wrapT = THREE.RepeatWrapping;
-    diffuse.repeat.set(26, 26);
-    diffuse.anisotropy = 8;
-    diffuse.colorSpace = THREE.SRGBColorSpace;
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      return tex;
+    })();
 
-    // --- normal map ---
-    const NC = 512;
-    const nc = document.createElement('canvas');
-    nc.width = NC;
-    nc.height = NC;
-    const nctx = nc.getContext('2d')!;
-    const nn = createNoise2D(() => 0.7);
-    const nn2 = createNoise2D(() => 0.2);
+    const { dirtColor, dirtNormal, dirtRough, dirtAO, greenColor, greenNormal, greenRough, greenAO, grassColor, grassNormal, grassRough, grassAO } = textures;
 
-    for (let y = 0; y < NC; y++) {
-      for (let x = 0; x < NC; x++) {
-        const u = x / NC, v = y / NC;
-        const a = nn(u * 80, v * 80) * 0.5 + 0.5;
-        const b2 = nn(u * 200, v * 200) * 0.5 + 0.5;
-        const c2 = nn2(u * 40, v * 40) * 0.5 + 0.5;
+    [dirtColor, greenColor, grassColor].forEach((tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      tex.colorSpace = THREE.SRGBColorSpace;
+    });
 
-        const r = Math.floor(128 + (a - 0.5) * 90 + (c2 - 0.5) * 30);
-        const g = Math.floor(128 + (b2 - 0.5) * 90 + (c2 - 0.5) * 30);
-        nctx.fillStyle = `rgb(${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},255)`;
-        nctx.fillRect(x, y, 1, 1);
-      }
-    }
-    const normalMap = new THREE.CanvasTexture(nc);
-    normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(30, 30);
+    [dirtNormal, greenNormal, grassNormal, dirtRough, greenRough, grassRough, dirtAO, greenAO, grassAO].forEach((tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+    });
 
-    // --- roughness map ---
-    const RC = 512;
-    const rc = document.createElement('canvas');
-    rc.width = RC;
-    rc.height = RC;
-    const rctx = rc.getContext('2d')!;
-    const rn = createNoise2D(() => 0.1);
+    dirtColor.repeat.set(20, 20);
+    greenColor.repeat.set(22, 22);
+    grassColor.repeat.set(40, 40);
+    dirtNormal.repeat.set(20, 20);
+    greenNormal.repeat.set(22, 22);
+    grassNormal.repeat.set(40, 40);
+    dirtRough.repeat.set(20, 20);
+    greenRough.repeat.set(22, 22);
+    grassRough.repeat.set(40, 40);
+    dirtAO.repeat.set(20, 20);
+    greenAO.repeat.set(22, 22);
+    grassAO.repeat.set(40, 40);
+    blendNoise.repeat.set(6, 6);
 
-    for (let y = 0; y < RC; y++) {
-      for (let x = 0; x < RC; x++) {
-        const n = rn(x / RC * 40, y / RC * 40) * 0.5 + 0.5;
-        const val = Math.floor(188 + n * 58);
-        rctx.fillStyle = `rgb(${val},${val},${val})`;
-        rctx.fillRect(x, y, 1, 1);
-      }
-    }
-    const roughMap = new THREE.CanvasTexture(rc);
-    roughMap.wrapS = roughMap.wrapT = THREE.RepeatWrapping;
-    roughMap.repeat.set(28, 28);
-
-    // --- ambient occlusion map ---
-    const AC = 512;
-    const ac = document.createElement('canvas');
-    ac.width = AC;
-    ac.height = AC;
-    const actx = ac.getContext('2d')!;
-    const an = createNoise2D(() => 0.87);
-    for (let y = 0; y < AC; y++) {
-      for (let x = 0; x < AC; x++) {
-        const n = an((x / AC) * 35, (y / AC) * 35) * 0.5 + 0.5;
-        const val = Math.floor(135 + n * 90);
-        actx.fillStyle = `rgb(${val},${val},${val})`;
-        actx.fillRect(x, y, 1, 1);
-      }
-    }
-    const aoMap = new THREE.CanvasTexture(ac);
-    aoMap.wrapS = aoMap.wrapT = THREE.RepeatWrapping;
-    aoMap.repeat.set(20, 20);
-
-    return new THREE.MeshStandardMaterial({
-      map: diffuse,
-      vertexColors: true,
-      normalMap,
-      normalScale: new THREE.Vector2(1.35, 1.35),
-      roughnessMap: roughMap,
-      roughness: 0.94,
-      aoMap,
-      aoMapIntensity: 0.55,
+    const material = new THREE.MeshStandardMaterial({
+      map: dirtColor,
+      normalMap: dirtNormal,
+      roughnessMap: dirtRough,
+      aoMap: dirtAO,
+      aoMapIntensity: 0.35,
+      roughness: 0.95,
       metalness: 0.0,
-      envMapIntensity: 0.45,
+      envMapIntensity: 0.35,
       side: THREE.FrontSide,
     });
-  }, []);
+    material.normalScale = new THREE.Vector2(1.0, 1.0);
+
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.map2 = { value: greenColor };
+      shader.uniforms.map3 = { value: grassColor };
+      shader.uniforms.noiseMap = { value: blendNoise };
+
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNormal;\nvarying vec2 vUv2;'
+        )
+        .replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWorldNormal = normalize(mat3(modelMatrix) * normal);'
+        )
+        .replace(
+          '#include <uv_vertex>',
+          '#include <uv_vertex>\nvUv2 = uv;'
+        );
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform sampler2D map2;\nuniform sampler2D map3;\nuniform sampler2D noiseMap;\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNormal;\nvarying vec2 vUv2;\nvec2 baseUv;\nvec2 greenUv;\nvec2 grassUv;\nfloat baseMask;\nfloat greenMask;\nfloat grassMask;'
+        )
+        .replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+            vec2 uvJitter = (texture2D(noiseMap, vUv2 * 0.7).rg - 0.5) * 0.03;
+            baseUv = vUv2 * 20.0 + uvJitter;
+            greenUv = vUv2 * 22.0 + uvJitter * 1.4;
+            grassUv = vUv2 * 40.0 + uvJitter * 2.0;
+
+            float heightNorm = clamp((vWorldPos.y + 1.5) / 5.0, 0.0, 1.0);
+            float slope = 1.0 - clamp(vWorldNormal.y, 0.0, 1.0);
+            float n = texture2D(noiseMap, vUv2 * 4.0).r;
+
+            greenMask = smoothstep(0.35, 0.7, n) * smoothstep(0.12, 0.55, heightNorm) * (1.0 - slope * 1.1);
+            grassMask = smoothstep(0.55, 0.92, n) * smoothstep(0.18, 0.6, heightNorm) * (1.0 - slope * 1.5);
+            baseMask = 1.0 - clamp(greenMask + grassMask, 0.0, 1.0);
+            float total = baseMask + greenMask + grassMask + 0.0001;
+            baseMask /= total;
+            greenMask /= total;
+            grassMask /= total;
+
+            vec4 baseColor = texture2D(map, baseUv);
+            vec4 greenColor = texture2D(map2, greenUv);
+            vec4 grassColor = texture2D(map3, grassUv);
+            vec4 blendedColor = baseColor * baseMask + greenColor * greenMask + grassColor * grassMask;
+            diffuseColor *= blendedColor;
+          #endif`
+        );
+    };
+
+    return material;
+  }, [textures]);
 
   // ── Costmap / segmentation overlay texture ──
   const overlayTexture = useMemo(() => {

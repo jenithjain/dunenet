@@ -23,15 +23,34 @@ function getTerrainHeight(
   z: number,
   worldSize: number,
 ) {
-  const raw =
-    noise2D(x * 0.006, z * 0.006) * 10 +
-    noise2D(x * 0.015, z * 0.015) * 4 +
-    noise2D(x * 0.04, z * 0.04) * 1.5 +
-    noise2D(x * 0.1, z * 0.1) * 0.4 +
-    noise2D(x * 0.25, z * 0.25) * 0.1;
+  let h = 0;
+  h += noise2D(x * 0.0025, z * 0.0025) * 2.2;
+  h += noise2D(x * 0.008, z * 0.008) * 1.1;
+  h += noise2D(x * 0.03, z * 0.03) * 0.6;
+  h += noise2D(x * 0.12, z * 0.12) * 0.22;
+
+  const slope = (z / (worldSize * 0.5)) * 1.4;
+  h += slope;
+
   const dist = Math.sqrt(x * x + z * z) / (worldSize * 0.5);
-  const falloff = Math.max(0, 1 - Math.pow(dist, 3));
-  return raw * falloff;
+  const falloff = Math.max(0, 1 - dist * dist * 0.55);
+  return h * falloff;
+}
+
+function getTerrainSlope(
+  noise2D: ReturnType<typeof createNoise2D>,
+  x: number,
+  z: number,
+  worldSize: number,
+) {
+  const eps = 1.5;
+  const hL = getTerrainHeight(noise2D, x - eps, z, worldSize);
+  const hR = getTerrainHeight(noise2D, x + eps, z, worldSize);
+  const hD = getTerrainHeight(noise2D, x, z - eps, worldSize);
+  const hU = getTerrainHeight(noise2D, x, z + eps, worldSize);
+  const dx = (hR - hL) / (2 * eps);
+  const dz = (hU - hD) / (2 * eps);
+  return Math.min(1, Math.sqrt(dx * dx + dz * dz));
 }
 
 // ─── Procedural geometry builders (photorealistic detail) ──────
@@ -151,76 +170,169 @@ function applyCactusRibs(geo: THREE.BufferGeometry, radialSegs: number, depth: n
 }
 
 /**
- * Barrel cactus — short squat ribbed sphere with flower crown.
+ * Barrel cactus — proper ribbed cylinder with dome top and spine nodules.
+ * No sphere blobs — all geometry is cylindrical/conical so ribs are prominent.
  */
 function createBarrelCactusGeometry(): THREE.BufferGeometry {
-  const r = 16;
-  const body = new THREE.SphereGeometry(0.35, r, 12);
-  body.scale(1, 0.75, 1);
+  const RSEGS = 24; // must be divisible for clean ribs
+  const HSEGS = 10;
+  const RIB_DEPTH = 0.045;
 
-  const pos = body.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const z = pos.getZ(i);
+  // Main cylindrical body (open, capped separately for cleaner normals)
+  const body = new THREE.CylinderGeometry(0.19, 0.24, 0.58, RSEGS, HSEGS, true);
+  // Deep prominent ribs
+  const bPos = body.attributes.position;
+  for (let i = 0; i < bPos.count; i++) {
+    const x = bPos.getX(i);
+    const y = bPos.getY(i);
+    const z = bPos.getZ(i);
     const angle = Math.atan2(z, x);
-    const ribFactor = Math.sin(angle * 10) * 0.025;
+    // 12 ribs with sharp sine ridges
+    const rib = Math.sin(angle * 12) * RIB_DEPTH;
+    // Ribs tighten near top (natural barrel taper)
+    const yNorm = (y + 0.29) / 0.58;
+    const taperRib = rib * (1.0 - yNorm * 0.3);
     const len = Math.sqrt(x * x + z * z) || 1;
-    pos.setXYZ(i, x + (x / len) * ribFactor, y, z + (z / len) * ribFactor);
+    bPos.setXYZ(i, x + (x / len) * taperRib, y, z + (z / len) * taperRib);
   }
 
-  const crown = new THREE.TorusGeometry(0.08, 0.02, 6, 12);
-  crown.translate(0, 0.26, 0);
+  // Dome top — shallow hemisphere, NOT a full sphere
+  const dome = new THREE.SphereGeometry(0.195, RSEGS, 6, 0, Math.PI * 2, 0, Math.PI * 0.42);
+  const dPos = dome.attributes.position;
+  for (let i = 0; i < dPos.count; i++) {
+    const x = dPos.getX(i);
+    const z = dPos.getZ(i);
+    const angle = Math.atan2(z, x);
+    const rib = Math.sin(angle * 12) * RIB_DEPTH * 0.7;
+    const len = Math.sqrt(x * x + z * z) || 1;
+    dPos.setXYZ(i, x + (x / len) * rib, dPos.getY(i), z + (z / len) * rib);
+  }
+  dome.translate(0, 0.29, 0);
 
-  const merged = mergeGeometries([body, crown]);
+  // Flat bottom disc
+  const bottom = new THREE.CircleGeometry(0.24, RSEGS);
+  bottom.rotateX(-Math.PI / 2);
+  bottom.translate(0, -0.29, 0);
+
+  // Spine nodule rows — tiny flat discs along each rib ridge
+  const spineGeos: THREE.BufferGeometry[] = [];
+  const RIB_COUNT = 12;
+  const SPINE_ROWS = 5;
+  for (let rib = 0; rib < RIB_COUNT; rib++) {
+    const ribAngle = (rib / RIB_COUNT) * Math.PI * 2;
+    for (let row = 0; row < SPINE_ROWS; row++) {
+      const yPos = -0.22 + (row / (SPINE_ROWS - 1)) * 0.44;
+      const yNorm = (yPos + 0.29) / 0.58;
+      const r = 0.19 + RIB_DEPTH * (1.0 - yNorm * 0.3); // sit on rib surface
+      const spine = new THREE.CylinderGeometry(0.006, 0.009, 0.03, 4, 1);
+      spine.rotateX(Math.PI / 2);
+      spine.translate(
+        Math.cos(ribAngle) * r,
+        yPos,
+        Math.sin(ribAngle) * r,
+      );
+      const sm = new THREE.Matrix4().makeRotationY(ribAngle);
+      spine.applyMatrix4(sm);
+      spineGeos.push(spine);
+    }
+  }
+  const spines = mergeGeometries(spineGeos.map(g => g.index ? g.toNonIndexed() : g));
+
+  const parts: THREE.BufferGeometry[] = [body, dome, bottom];
+  if (spines) parts.push(spines);
+  const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
   if (!merged) return body;
   merged.computeVertexNormals();
   return merged;
 }
 
 /**
- * Dry desert shrub — cluster with elongated tendrils.
+ * Dry desert scrub — thin woody branching structure, zero blobs.
+ * Main branches fan out from base, each with several sub-twigs and bud tips.
  */
 function createBushGeometry(): THREE.BufferGeometry {
   const noise = createNoise2D(() => 0.73);
   const parts: THREE.BufferGeometry[] = [];
 
-  const main = new THREE.IcosahedronGeometry(0.40, 2);
-  main.scale(1, 0.5, 1);
-  parts.push(main);
+  // Thick base stump
+  const stump = new THREE.CylinderGeometry(0.035, 0.055, 0.12, 6, 1);
+  stump.translate(0, 0.06, 0);
+  parts.push(stump);
 
-  const offsets: [number, number, number, number][] = [
-    [0.30, 0.06, 0.22, 0.20], [-0.26, 0.0, 0.30, 0.18],
-    [0.08, 0.14, -0.32, 0.22], [-0.30, 0.03, -0.16, 0.15],
-    [0.24, -0.04, -0.24, 0.17], [-0.12, 0.10, 0.34, 0.19],
-    [0.32, 0.0, 0.0, 0.16], [-0.05, 0.08, -0.28, 0.14],
-    [0.18, 0.06, 0.16, 0.12],
-  ];
+  const MAIN_BRANCHES = 8;
+  for (let i = 0; i < MAIN_BRANCHES; i++) {
+    const a = (i / MAIN_BRANCHES) * Math.PI * 2;
+    // Main branch length varies 0.45 – 0.80
+    const bl = 0.45 + Math.abs(Math.sin(i * 1.7)) * 0.35;
+    // Lean angle: spread outward strongly
+    const leanZ = 0.55 + Math.abs(Math.sin(i * 0.9)) * 0.32;
 
-  for (const [ox, oy, oz, sz] of offsets) {
-    const s = new THREE.IcosahedronGeometry(sz, 1);
-    s.scale(1, 0.45, 1);
-    s.translate(ox, oy, oz);
-    parts.push(s);
-  }
-
-  // thin branch-like cylinders
-  const branchAngles = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 5.0];
-  for (const a of branchAngles) {
-    const branch = new THREE.CylinderGeometry(0.012, 0.018, 0.35, 4, 1);
-    branch.translate(0, 0.175, 0);
-    const m = new THREE.Matrix4()
-      .makeRotationZ(0.4 + Math.sin(a) * 0.3)
-      .multiply(new THREE.Matrix4().makeRotationY(a));
-    m.setPosition(Math.cos(a) * 0.15, 0.1, Math.sin(a) * 0.15);
-    branch.applyMatrix4(m);
+    const branch = new THREE.CylinderGeometry(0.006, 0.018, bl, 4, 3);
+    // Bend: displace upper verts outward
+    const bPos = branch.attributes.position;
+    for (let v = 0; v < bPos.count; v++) {
+      const yv = bPos.getY(v); // range -bl/2..bl/2
+      const norm = (yv + bl * 0.5) / bl; // 0 at base, 1 at tip
+      const bow = Math.pow(norm, 2.2) * 0.08;
+      bPos.setX(v, bPos.getX(v) + bow * Math.cos(a));
+      bPos.setZ(v, bPos.getZ(v) + bow * Math.sin(a));
+    }
+    branch.translate(0, bl * 0.5, 0);
+    const bm = new THREE.Matrix4()
+      .makeRotationY(a)
+      .multiply(new THREE.Matrix4().makeRotationZ(leanZ));
+    bm.setPosition(Math.cos(a) * 0.04, 0.10, Math.sin(a) * 0.04);
+    branch.applyMatrix4(bm);
     parts.push(branch);
+
+    // 3–4 sub-twigs from upper half of each main branch
+    const SUB = 3 + (i % 2);
+    for (let j = 0; j < SUB; j++) {
+      const ta = a + (j / SUB - 0.5) * 1.4;
+      const tl = 0.14 + Math.abs(Math.sin(i * 2.3 + j)) * 0.12;
+      const twig = new THREE.CylinderGeometry(0.003, 0.009, tl, 3, 1);
+      twig.translate(0, tl * 0.5, 0);
+      // Position twig at 60–85% up the parent branch (in local coords before transform)
+      const progAlong = 0.60 + (j / SUB) * 0.25;
+      // Compute world position along branch tip direction
+      const branchTipX = Math.cos(a) * (bl * progAlong * Math.sin(leanZ)) + 0.04 * Math.cos(a);
+      const branchTipY = 0.10 + bl * progAlong * Math.cos(leanZ);
+      const branchTipZ = Math.sin(a) * (bl * progAlong * Math.sin(leanZ)) + 0.04 * Math.sin(a);
+      const tm = new THREE.Matrix4()
+        .makeRotationY(ta)
+        .multiply(new THREE.Matrix4().makeRotationZ(0.7 + Math.sin(j * 1.9) * 0.25));
+      tm.setPosition(branchTipX, branchTipY, branchTipZ);
+      twig.applyMatrix4(tm);
+      parts.push(twig);
+
+      // Small forked split at twig tip — two tiny diverging stubs
+      const budX = branchTipX + Math.cos(ta) * tl * 0.85 * Math.sin(0.7);
+      const budY = branchTipY + tl * 0.85 * Math.cos(0.7);
+      const budZ = branchTipZ + Math.sin(ta) * tl * 0.85 * Math.sin(0.7);
+      const forkAngle1 = ta + 0.5;
+      const forkAngle2 = ta - 0.5;
+      const forkLen = 0.055 + Math.abs(Math.sin(i + j)) * 0.03;
+      for (const fa of [forkAngle1, forkAngle2]) {
+        const fork = new THREE.CylinderGeometry(0.002, 0.006, forkLen, 3, 1);
+        fork.translate(0, forkLen * 0.5, 0);
+        const fm = new THREE.Matrix4()
+          .makeRotationY(fa)
+          .multiply(new THREE.Matrix4().makeRotationZ(0.55 + Math.sin(fa) * 0.2));
+        fm.setPosition(budX, budY, budZ);
+        fork.applyMatrix4(fm);
+        parts.push(fork);
+      }
+    }
   }
 
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return main;
+  if (!merged) return stump;
 
   const pos = merged.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const base = new THREE.Color('#5c4a1e');   // dark olive root
+  const mid  = new THREE.Color('#8a7040');   // warm tan mid-stem
+  const tip  = new THREE.Color('#b09550');   // pale gold tip
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
@@ -231,52 +343,145 @@ function createBushGeometry(): THREE.BufferGeometry {
       noise(x * 16, z * 16) * 0.012;
     const len = Math.sqrt(x * x + y * y + z * z) || 1;
     pos.setXYZ(i, x + (x / len) * n, y + (y / len) * n * 0.4, z + (z / len) * n);
+
+    const t = THREE.MathUtils.clamp((y + 0.05) / 0.75, 0, 1);
+    const tint = t < 0.5
+      ? base.clone().lerp(mid, t * 2)
+      : mid.clone().lerp(tip, (t - 0.5) * 2);
+    colors[i * 3]     = tint.r;
+    colors[i * 3 + 1] = tint.g;
+    colors[i * 3 + 2] = tint.b;
   }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   merged.computeVertexNormals();
   return merged;
 }
 
 /**
- * Dead tree — gnarled trunk with bare forked branches.
+ * Tall dry grass clump — 16 thin tapered strand blades, curved and varied,
+ * resembling savanna / oat grass / dry wheat field strands.
  */
-function createDeadTreeGeometry(): THREE.BufferGeometry {
-  const noise = createNoise2D(() => 0.55);
+function createGrassClumpGeometry(): THREE.BufferGeometry {
+  const rng = createNoise2D(() => 0.19);
+  const blades: THREE.BufferGeometry[] = [];
+  const BLADE_COUNT = 16;
+
+  for (let i = 0; i < BLADE_COUNT; i++) {
+    // Height strictly positive: 0.35 – 0.90 units
+    const t = i / BLADE_COUNT;
+    const h = Math.max(0.35, 0.45 + Math.abs(rng(i * 1.3, 0)) * 0.45 + Math.abs(rng(i * 0.7, 1.0)) * 0.1);
+    // Thin tapered strand: top radius near-zero, base slightly wider
+    const blade = new THREE.CylinderGeometry(0.002, 0.012, h, 3, 4);
+    const pos = blade.attributes.position;
+
+    // Bend each blade: vertices higher up get displaced outward
+    const angle = t * Math.PI * 2 + rng(i, 0.5) * 0.8;
+    const leanAmount = 0.12 + Math.abs(rng(i * 2.1, i * 0.3)) * 0.18;
+    for (let v = 0; v < pos.count; v++) {
+      const yv = pos.getY(v) + h * 0.5; // map [-h/2, h/2] → [0, h]
+      const norm = h > 0 ? yv / h : 0;
+      const bendFactor = Math.pow(Math.max(0, norm), 2.5) * leanAmount;
+      pos.setX(v, pos.getX(v) + Math.cos(angle) * bendFactor);
+      pos.setZ(v, pos.getZ(v) + Math.sin(angle) * bendFactor);
+    }
+    // Shift blade so its base is at y=0
+    blade.translate(0, h * 0.5, 0);
+
+    // Spread blades outward from clump center
+    const spreadAngle = t * Math.PI * 2 + rng(i * 0.9, 2.2) * 0.6;
+    const spreadR = 0.04 + Math.abs(rng(i * 1.7, i * 1.1)) * 0.14;
+    const m = new THREE.Matrix4()
+      .makeRotationY(spreadAngle)
+      .multiply(new THREE.Matrix4().makeRotationZ(rng(i * 0.5, i * 1.2) * 0.08));
+    m.setPosition(
+      Math.cos(spreadAngle) * spreadR,
+      0,
+      Math.sin(spreadAngle) * spreadR,
+    );
+    blade.applyMatrix4(m);
+    blades.push(blade);
+  }
+
+  // Add vertex color gradient: golden base → lighter tip
+  const merged = mergeGeometries(blades.map(g => g.index ? g.toNonIndexed() : g));
+  if (!merged) return blades[0];
+
+  const mergedPos = merged.attributes.position;
+  const colors = new Float32Array(mergedPos.count * 3);
+  const baseCol = new THREE.Color('#9b7a28');   // dark golden base
+  const midCol  = new THREE.Color('#c9a84c');   // warm amber mid
+  const tipCol  = new THREE.Color('#e8d89a');   // pale straw tip
+  for (let i = 0; i < mergedPos.count; i++) {
+    const y = mergedPos.getY(i);
+    const maxH = 0.85;
+    const t2 = THREE.MathUtils.clamp(y / maxH, 0, 1);
+    const col = t2 < 0.5
+      ? baseCol.clone().lerp(midCol, t2 * 2)
+      : midCol.clone().lerp(tipCol, (t2 - 0.5) * 2);
+    colors[i * 3]     = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  merged.computeVertexNormals();
+  return merged;
+}
+
+/**
+ * Small pebble — flattened icosahedron.
+ */
+function createPebbleGeometry(): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(0.18, 0);
+  geo.scale(1.2, 0.6, 1.0);
+  return geo;
+}
+
+/**
+ * Ocotillo-style cactus — thin stems with light branching.
+ */
+function createOcotilloGeometry(): THREE.BufferGeometry {
+  const noise = createNoise2D(() => 0.62);
   const parts: THREE.BufferGeometry[] = [];
 
-  const trunk = new THREE.CylinderGeometry(0.06, 0.12, 1.6, 8, 6);
-  const tPos = trunk.attributes.position;
-  for (let i = 0; i < tPos.count; i++) {
-    const y = tPos.getY(i);
-    const bend = (y / 1.6) * 0.1;
-    tPos.setX(i, tPos.getX(i) + bend);
-    const n = noise(tPos.getX(i) * 5, y * 3) * 0.015;
-    tPos.setX(i, tPos.getX(i) + n);
-    tPos.setZ(i, tPos.getZ(i) + n * 0.7);
-  }
-  trunk.translate(0, 0.8, 0);
-  parts.push(trunk);
-
-  const branchConfigs = [
-    { angle: 0.5, rotY: 0, length: 0.6, radius: 0.04, yOff: 1.2 },
-    { angle: -0.4, rotY: Math.PI * 0.6, length: 0.5, radius: 0.035, yOff: 1.3 },
-    { angle: 0.6, rotY: Math.PI * 1.2, length: 0.45, radius: 0.03, yOff: 1.0 },
-    { angle: 0.3, rotY: Math.PI * 0.3, length: 0.3, radius: 0.025, yOff: 1.5 },
-  ];
-
-  for (const cfg of branchConfigs) {
-    const branch = new THREE.CylinderGeometry(cfg.radius * 0.5, cfg.radius, cfg.length, 6, 3);
-    branch.translate(0, cfg.length / 2, 0);
+  const stemCount = 8;
+  for (let i = 0; i < stemCount; i++) {
+    const stem = new THREE.CylinderGeometry(0.03, 0.05, 2.0, 6, 8);
+    const sPos = stem.attributes.position;
+    for (let v = 0; v < sPos.count; v++) {
+      const y = sPos.getY(v);
+      const sway = (y / 2.0) * (0.08 + noise(i * 2.1, y * 3.2) * 0.05);
+      sPos.setX(v, sPos.getX(v) + sway);
+      sPos.setZ(v, sPos.getZ(v) + sway * 0.4);
+    }
+    stem.translate(0, 1.0, 0);
+    const a = (i / stemCount) * Math.PI * 2;
     const m = new THREE.Matrix4()
-      .makeRotationZ(cfg.angle)
-      .multiply(new THREE.Matrix4().makeRotationY(cfg.rotY));
-    m.setPosition(0.05, cfg.yOff, 0);
-    branch.applyMatrix4(m);
-    parts.push(branch);
+      .makeRotationY(a)
+      .multiply(new THREE.Matrix4().makeRotationZ(0.12 + noise(i * 1.7, 0) * 0.12));
+    m.setPosition(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08);
+    stem.applyMatrix4(m);
+    parts.push(stem);
   }
+
+  const branches: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 5; i++) {
+    const branch = new THREE.CylinderGeometry(0.02, 0.035, 0.9, 5, 5);
+    branch.translate(0, 0.45, 0);
+    const a = (i / 5) * Math.PI * 2;
+    const m = new THREE.Matrix4()
+      .makeRotationY(a)
+      .multiply(new THREE.Matrix4().makeRotationZ(0.4 + noise(i * 2.3, 0) * 0.2));
+    m.setPosition(Math.cos(a) * 0.12, 1.1, Math.sin(a) * 0.12);
+    branch.applyMatrix4(m);
+    branches.push(branch);
+  }
+  const branchMerged = mergeGeometries(branches.map(g => g.index ? g.toNonIndexed() : g));
+  if (branchMerged) parts.push(branchMerged);
 
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return trunk;
+  if (!merged) return parts[0];
   merged.computeVertexNormals();
   return merged;
 }
@@ -400,71 +605,70 @@ function createBarrelCactusMaterial(): THREE.MeshStandardMaterial {
   canvas.width = TEX; canvas.height = TEX;
   const ctx = canvas.getContext('2d')!;
   const n = createNoise2D(() => 0.44);
+  const n2 = createNoise2D(() => 0.82);
 
   for (let y = 0; y < TEX; y++) {
     for (let x = 0; x < TEX; x++) {
       const u = x / TEX, v = y / TEX;
-      const c = n(u * 50, v * 50) * 0.5 + 0.5;
-      const r = Math.floor(55 + c * 25);
-      const g = Math.floor(100 + c * 30);
-      const b = Math.floor(35 + c * 15);
+      // Vertical rib shading bands
+      const rib = Math.sin(u * Math.PI * 24) * 0.5 + 0.5;
+      const fine = n(u * 80, v * 80) * 0.5 + 0.5;
+      const macro = n2(u * 20, v * 20) * 0.5 + 0.5;
+      const c = rib * 0.5 + fine * 0.3 + macro * 0.2;
+      // Dark earthy green — ribs darker, ridges lighter
+      const r = Math.floor(28 + c * 32);
+      const g = Math.floor(62 + c * 48);
+      const b = Math.floor(18 + c * 20);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x, y, 1, 1);
     }
   }
   const diffuse = new THREE.CanvasTexture(canvas);
+  diffuse.wrapS = diffuse.wrapT = THREE.RepeatWrapping;
   diffuse.colorSpace = THREE.SRGBColorSpace;
 
   return new THREE.MeshStandardMaterial({
-    map: diffuse, roughness: 0.6, metalness: 0.0, envMapIntensity: 0.2,
-    emissive: '#1a3015', emissiveIntensity: 0.04,
+    map: diffuse, roughness: 0.7, metalness: 0.0, envMapIntensity: 0.2,
+    emissive: '#0f1f08', emissiveIntensity: 0.06,
   });
 }
 
 function createBushMaterial(): THREE.MeshStandardMaterial {
-  const TEX = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = TEX; canvas.height = TEX;
-  const ctx = canvas.getContext('2d')!;
-  const n = createNoise2D(() => 0.61);
-
-  for (let y = 0; y < TEX; y++) {
-    for (let x = 0; x < TEX; x++) {
-      const u = x / TEX, v = y / TEX;
-      const c = n(u * 60, v * 60) * 0.5 + 0.5;
-      const c2 = n(u * 150, v * 150) * 0.5 + 0.5;
-      const mix = c * 0.6 + c2 * 0.4;
-      const r = Math.floor(85 + mix * 35);
-      const g = Math.floor(95 + mix * 30);
-      const b = Math.floor(48 + mix * 22);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
-  const diffuse = new THREE.CanvasTexture(canvas);
-  diffuse.colorSpace = THREE.SRGBColorSpace;
-
   return new THREE.MeshStandardMaterial({
-    map: diffuse, roughness: 0.88, metalness: 0.0, envMapIntensity: 0.12, side: THREE.DoubleSide,
+    color: '#ffffff',    // pure white so vertex colors come through unmodified
+    roughness: 0.92,
+    metalness: 0.0,
+    envMapIntensity: 0.12,
+    side: THREE.DoubleSide,
+    vertexColors: true,
   });
 }
 
-function createDeadTreeMaterial(): THREE.MeshStandardMaterial {
+function createGrassMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: '#d4aa55',        // warm golden wheat base
+    roughness: 0.88,
+    metalness: 0.0,
+    envMapIntensity: 0.10,
+    side: THREE.DoubleSide,  // visible from both sides so blades show at any angle
+    vertexColors: true,      // gradient base→tip applied per-vertex
+  });
+}
+
+function createPebbleMaterial(): THREE.MeshStandardMaterial {
   const TEX = 128;
   const canvas = document.createElement('canvas');
   canvas.width = TEX; canvas.height = TEX;
   const ctx = canvas.getContext('2d')!;
-  const n = createNoise2D(() => 0.22);
+  const n = createNoise2D(() => 0.48);
 
   for (let y = 0; y < TEX; y++) {
     for (let x = 0; x < TEX; x++) {
       const u = x / TEX, v = y / TEX;
-      const bark = Math.sin(v * 80 + n(u * 10, v * 10) * 4) * 0.5 + 0.5;
-      const fine = n(u * 100, v * 100) * 0.5 + 0.5;
-      const c = bark * 0.6 + fine * 0.4;
-      const r = Math.floor(130 + c * 50);
-      const g = Math.floor(115 + c * 45);
-      const b = Math.floor(95 + c * 35);
+      const c = n(u * 70, v * 70) * 0.5 + 0.5;
+      const r = Math.floor(150 + c * 50);
+      const g = Math.floor(110 + c * 35);
+      const b = Math.floor(75 + c * 25);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x, y, 1, 1);
     }
@@ -473,7 +677,19 @@ function createDeadTreeMaterial(): THREE.MeshStandardMaterial {
   diffuse.colorSpace = THREE.SRGBColorSpace;
 
   return new THREE.MeshStandardMaterial({
-    map: diffuse, roughness: 0.9, metalness: 0.0, envMapIntensity: 0.15,
+    map: diffuse,
+    roughness: 0.92,
+    metalness: 0.0,
+    envMapIntensity: 0.2,
+  });
+}
+
+function createOcotilloMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: '#6f7b3a',
+    roughness: 0.78,
+    metalness: 0.0,
+    envMapIntensity: 0.18,
   });
 }
 
@@ -491,6 +707,8 @@ export default function Obstacles({
   const barrelRef = useRef<THREE.InstancedMesh>(null);
   const bushRef = useRef<THREE.InstancedMesh>(null);
   const treeRef = useRef<THREE.InstancedMesh>(null);
+  const grassRef = useRef<THREE.InstancedMesh>(null);
+  const pebbleRef = useRef<THREE.InstancedMesh>(null);
 
   const fract = (v: number) => v - Math.floor(v);
   const hash2 = (a: number, b: number) =>
@@ -500,13 +718,17 @@ export default function Obstacles({
   const cactusGeo = useMemo(() => createCactusGeometry(), []);
   const barrelGeo = useMemo(() => createBarrelCactusGeometry(), []);
   const bushGeo = useMemo(() => createBushGeometry(), []);
-  const treeGeo = useMemo(() => createDeadTreeGeometry(), []);
+  const treeGeo = useMemo(() => createOcotilloGeometry(), []);
+  const grassGeo = useMemo(() => createGrassClumpGeometry(), []);
+  const pebbleGeo = useMemo(() => createPebbleGeometry(), []);
 
   const rockMat = useMemo(() => createRockMaterial(), []);
   const cactusMat = useMemo(() => createCactusMaterial(), []);
   const barrelMat = useMemo(() => createBarrelCactusMaterial(), []);
   const bushMat = useMemo(() => createBushMaterial(), []);
-  const treeMat = useMemo(() => createDeadTreeMaterial(), []);
+  const treeMat = useMemo(() => createOcotilloMaterial(), []);
+  const grassMat = useMemo(() => createGrassMaterial(), []);
+  const pebbleMat = useMemo(() => createPebbleMaterial(), []);
 
   const {
     rockMatrices, rockColors,
@@ -514,6 +736,8 @@ export default function Obstacles({
     barrelMatrices, barrelColors,
     bushMatrices, bushColors,
     treeMatrices, treeColors,
+    grassMatrices, grassColors,
+    pebbleMatrices, pebbleColors,
   } = useMemo(() => {
     if (!costmapData) {
       return {
@@ -522,6 +746,8 @@ export default function Obstacles({
         barrelMatrices: [] as THREE.Matrix4[], barrelColors: [] as THREE.Color[],
         bushMatrices: [] as THREE.Matrix4[], bushColors: [] as THREE.Color[],
         treeMatrices: [] as THREE.Matrix4[], treeColors: [] as THREE.Color[],
+        grassMatrices: [] as THREE.Matrix4[], grassColors: [] as THREE.Color[],
+        pebbleMatrices: [] as THREE.Matrix4[], pebbleColors: [] as THREE.Color[],
       };
     }
 
@@ -531,6 +757,8 @@ export default function Obstacles({
     const barrelArr: { x: number; z: number; scale: number }[] = [];
     const bushArr: { x: number; z: number; scale: number }[] = [];
     const treeArr: { x: number; z: number; scale: number }[] = [];
+    const grassArr: { x: number; z: number; scale: number }[] = [];
+    const pebbleArr: { x: number; z: number; scale: number }[] = [];
 
     const step = 2;
     for (let gy = 0; gy < costmapHeight; gy += step) {
@@ -542,31 +770,79 @@ export default function Obstacles({
         const px = wx + jitterX;
         const pz = wz + jitterZ;
         const densityNoise = noise2D(px * 0.025, pz * 0.025) * 0.5 + 0.5;
+        const clusterNoise = noise2D(px * 0.012, pz * 0.012) * 0.5 + 0.5;
+        const patchNoise = noise2D(px * 0.004, pz * 0.004) * 0.5 + 0.5;
+        const patchMask = THREE.MathUtils.smoothstep(patchNoise, 0.45, 0.78);
         const ds = densityScale;
+        const height = getTerrainHeight(noise2D, px, pz, worldSize);
+        const slope = getTerrainSlope(noise2D, px, pz, worldSize);
 
-        if (val >= 10 && hash2(gx + 9.3, gy - 2.1) > (1 - 0.48 * ds)) {
-          const scale = 0.5 + (noise2D(px * 0.12, pz * 0.12) * 0.5 + 0.5) * 1.8;
+        if (val >= 10 && hash2(gx + 9.3, gy - 2.1) > (1 - 0.35 * ds)) {
+          const scale = 0.35 + (noise2D(px * 0.12, pz * 0.12) * 0.5 + 0.5) * 0.9;
           rockArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 7 && densityNoise > (1 - 0.48 * ds) && hash2(gx * 2.31, gy * 1.47) > (1 - 0.12 * ds)) {
-          const scale = 1.2 + hash2(gx * 0.77, gy * 0.33) * 1.6;
+        if (val < 6 && densityNoise > 0.6 && hash2(gx * 2.31, gy * 1.47) > (1 - 0.07 * ds)) {
+          const scale = 1.0 + hash2(gx * 0.77, gy * 0.33) * 1.2;
           cactusArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 6 && densityNoise > 0.40 && hash2(gx * 3.17, gy * 2.53) > (1 - 0.08 * ds)) {
-          const scale = 0.6 + hash2(gx * 0.91, gy * 0.62) * 1.0;
+        if (val < 5 && densityNoise > 0.45 && hash2(gx * 3.17, gy * 2.53) > (1 - 0.05 * ds)) {
+          const scale = 0.55 + hash2(gx * 0.91, gy * 0.62) * 0.85;
           barrelArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 8 && hash2(gx * 4.11, gy * 3.07) > (1 - 0.04 * ds)) {
-          const scale = 1.0 + hash2(gx * 0.59, gy * 0.41) * 1.5;
+        if (val < 8 && clusterNoise > 0.6 && slope < 0.42 && hash2(gx * 4.11, gy * 3.07) > (1 - 0.02 * ds)) {
+          const scale = 0.9 + hash2(gx * 0.59, gy * 0.41) * 1.2;
           treeArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 9 && densityNoise > (1 - 0.54 * ds) && hash2(gx * 1.91, gy * 0.83) > (1 - 0.33 * ds)) {
-          const scale = 0.5 + densityNoise * 0.9;
+        if (val < 9 && patchMask > 0.2 && densityNoise > (1 - 0.55 * ds) && hash2(gx * 1.91, gy * 0.83) > (1 - 0.48 * ds)) {
+          const scale = 0.65 + densityNoise * 1.15;
           bushArr.push({ x: px, z: pz, scale });
+        }
+
+        // Grass strands — tall golden blades in dense randomised spread patches
+        if (val < 7 && slope < 0.38 && height > -0.5 && height < 2.8) {
+          // Two-octave patch mask: large blobs × medium variation
+          const fieldNoise  = noise2D(px * 0.014, pz * 0.014) * 0.5 + 0.5; // large patch scale
+          const detailNoise = noise2D(px * 0.035, pz * 0.035) * 0.5 + 0.5; // break-up detail
+          const fieldMask = THREE.MathUtils.smoothstep(fieldNoise, 0.36, 0.68)
+                          * THREE.MathUtils.smoothstep(detailNoise, 0.28, 0.62);
+          const isInPatch = patchMask > 0.22 && fieldMask > 0.05;
+          const grassChance = isInPatch
+            ? (0.60 + clusterNoise * 0.35) * ds
+            : (0.03 + clusterNoise * 0.06) * ds;
+          if (hash2(gx * 3.91, gy * 2.17) > (1 - grassChance)) {
+            const scale = 0.85 + hash2(gx * 0.52, gy * 0.29) * 0.7;
+            grassArr.push({ x: px, z: pz, scale });
+            // Wide-radius burst: scatter 5–10 extra clumps up to 3.5 world-units away
+            // so each spawned point seeds a visible field patch
+            if (isInPatch && fieldMask > 0.2) {
+              const burst = 5 + Math.floor(hash2(gx * 13.7, gy * 9.3) * 6);
+              for (let b = 0; b < burst; b++) {
+                const sa = hash2(gx * (b + 2.1), gy * (b + 1.3)) * Math.PI * 2;
+                // Vary radius: inner ring 0.4–1.4, outer ring 1.5–3.5
+                const ring = hash2(gy * (b + 0.7), gx * (b + 3.1)) > 0.5 ? 1 : 0;
+                const sr = ring === 0
+                  ? 0.4 + hash2(gy * (b + 4.7), gx * (b + 2.9)) * 1.0
+                  : 1.5 + hash2(gy * (b + 6.1), gx * (b + 0.9)) * 2.0;
+                const sx = px + Math.cos(sa) * sr;
+                const sz2 = pz + Math.sin(sa) * sr;
+                const sc = 0.75 + hash2(sx * 0.33, sz2 * 0.51) * 0.70;
+                grassArr.push({ x: sx, z: sz2, scale: sc });
+              }
+            }
+          }
+        }
+
+        // Pebble clusters — lower slope, everywhere but peaks
+        if (val < 9 && slope < 0.55 && height < 2.8) {
+          const pebbleChance = (0.28 + densityNoise * 0.2) * ds;
+          if (hash2(gx * 7.07, gy * 5.33) > (1 - pebbleChance)) {
+            const scale = 0.35 + hash2(gx * 0.18, gy * 0.41) * 0.6;
+            pebbleArr.push({ x: px, z: pz, scale });
+          }
         }
       }
     }
@@ -639,7 +915,7 @@ export default function Obstacles({
       dummy.updateMatrix();
       tMats.push(dummy.matrix.clone());
       const cn = hash2(x * 0.15, z * 0.15);
-      tCols.push(new THREE.Color().setHSL(0.08 + cn * 0.03, 0.15 + cn * 0.1, 0.45 + cn * 0.15));
+      tCols.push(new THREE.Color().setHSL(0.2 + cn * 0.05, 0.28 + cn * 0.15, 0.38 + cn * 0.12));
     }
 
     const bMats: THREE.Matrix4[] = [];
@@ -647,7 +923,8 @@ export default function Obstacles({
     for (const { x, z, scale } of bushArr) {
       const ty = getTerrainHeight(noise2D, x, z, worldSize);
       const height = scale * (0.5 + hash2(x * 0.41, z * 0.77) * 0.8);
-      dummy.position.set(x, ty + height * 0.22, z);
+      // Raise bushes so branching base clears terrain surface
+      dummy.position.set(x, ty + scale * 0.28, z);
       dummy.rotation.set(0, noise2D(x * 0.09, z * 0.09) * Math.PI, noise2D(x * 0.4, z * 0.22) * 0.06);
       dummy.scale.set(scale * (0.8 + hash2(x, z) * 0.85), height, scale * (0.7 + hash2(z, x) * 0.9));
       dummy.updateMatrix();
@@ -658,12 +935,46 @@ export default function Obstacles({
       bCols.push(new THREE.Color().setHSL(hue, sat, lit));
     }
 
+    const gMats: THREE.Matrix4[] = [];
+    const gCols: THREE.Color[] = [];
+    for (const { x, z, scale } of grassArr) {
+      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      const rotY = noise2D(x * 0.2, z * 0.2) * Math.PI;
+      // Place base exactly on terrain — no vertical offset since blade base is at y=0
+      dummy.position.set(x, ty, z);
+      dummy.rotation.set(0, rotY, noise2D(x * 0.6, z * 0.4) * 0.04);
+      dummy.scale.set(scale, scale * (0.9 + hash2(x * 0.33, z * 0.51) * 0.5), scale);
+      dummy.updateMatrix();
+      gMats.push(dummy.matrix.clone());
+      const cn = hash2(x * 0.7, z * 0.7);
+      gCols.push(new THREE.Color().setHSL(0.12 + cn * 0.05, 0.35 + cn * 0.15, 0.56 + cn * 0.12));
+    }
+
+    const pMats: THREE.Matrix4[] = [];
+    const pCols: THREE.Color[] = [];
+    for (const { x, z, scale } of pebbleArr) {
+      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      dummy.position.set(x, ty + scale * 0.05, z);
+      dummy.rotation.set(
+        noise2D(x * 0.4, z * 0.2) * 0.3,
+        noise2D(x * 0.1, z * 0.1) * Math.PI,
+        noise2D(x * 0.2, z * 0.5) * 0.2,
+      );
+      dummy.scale.set(scale, scale * (0.7 + hash2(x, z) * 0.6), scale * (0.8 + hash2(z, x) * 0.4));
+      dummy.updateMatrix();
+      pMats.push(dummy.matrix.clone());
+      const cn = hash2(x * 0.25, z * 0.25);
+      pCols.push(new THREE.Color().setHSL(0.08 + cn * 0.04, 0.18 + cn * 0.12, 0.45 + cn * 0.12));
+    }
+
     return {
       rockMatrices: rMats, rockColors: rCols,
       cactusMatrices: cMats, cactusColors: cCols,
       barrelMatrices: baMats, barrelColors: baCols,
       bushMatrices: bMats, bushColors: bCols,
       treeMatrices: tMats, treeColors: tCols,
+      grassMatrices: gMats, grassColors: gCols,
+      pebbleMatrices: pMats, pebbleColors: pCols,
     };
   }, [costmapData, costmapWidth, costmapHeight, worldSize, densityScale]);
 
@@ -672,6 +983,8 @@ export default function Obstacles({
   const barrelCount = barrelMatrices.length;
   const bushCount = bushMatrices.length;
   const treeCount = treeMatrices.length;
+  const grassCount = grassMatrices.length;
+  const pebbleCount = pebbleMatrices.length;
 
   useEffect(() => {
     const mesh = rocksRef.current;
@@ -713,7 +1026,23 @@ export default function Obstacles({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [treeCount, treeMatrices, treeColors]);
 
-  const totalCount = rockCount + cactusCount + barrelCount + bushCount + treeCount;
+  useEffect(() => {
+    const mesh = grassRef.current;
+    if (!mesh || grassCount === 0) return;
+    for (let i = 0; i < grassCount; i++) { mesh.setMatrixAt(i, grassMatrices[i]); mesh.setColorAt(i, grassColors[i]); }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [grassCount, grassMatrices, grassColors]);
+
+  useEffect(() => {
+    const mesh = pebbleRef.current;
+    if (!mesh || pebbleCount === 0) return;
+    for (let i = 0; i < pebbleCount; i++) { mesh.setMatrixAt(i, pebbleMatrices[i]); mesh.setColorAt(i, pebbleColors[i]); }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [pebbleCount, pebbleMatrices, pebbleColors]);
+
+  const totalCount = rockCount + cactusCount + barrelCount + bushCount + treeCount + grassCount + pebbleCount;
   if (totalCount === 0) return null;
 
   return (
@@ -723,6 +1052,8 @@ export default function Obstacles({
       {barrelCount > 0 && <instancedMesh ref={barrelRef} args={[barrelGeo, barrelMat, barrelCount]} castShadow receiveShadow frustumCulled={false} />}
       {bushCount > 0 && <instancedMesh ref={bushRef} args={[bushGeo, bushMat, bushCount]} castShadow receiveShadow frustumCulled={false} />}
       {treeCount > 0 && <instancedMesh ref={treeRef} args={[treeGeo, treeMat, treeCount]} castShadow receiveShadow frustumCulled={false} />}
+      {grassCount > 0 && <instancedMesh ref={grassRef} args={[grassGeo, grassMat, grassCount]} castShadow receiveShadow frustumCulled={false} />}
+      {pebbleCount > 0 && <instancedMesh ref={pebbleRef} args={[pebbleGeo, pebbleMat, pebbleCount]} castShadow receiveShadow frustumCulled={false} />}
     </group>
   );
 }

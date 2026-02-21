@@ -7,10 +7,10 @@ export interface SimSettings {
   // ── Environment ──
   obstacleDensity: number;      // 0.005 – 0.12   (fraction)
   roughDensity: number;         // 0.02  – 0.3
-  dustCount: number;            // 100  – 3000
-  dustOpacity: number;          // 0.0  – 0.5
-  dustSize: number;             // 0.02 – 0.25
-  fogDensity: number;           // 0.0  – 0.006
+  dustCount: number;            // 0    – 6000
+  dustOpacity: number;          // 0.0  – 0.85
+  dustSize: number;             // 0.02 – 0.45
+  fogDensity: number;           // 0.0  – 0.02
   fogColor: string;             // hex
 
   // ── Lighting / sky ──
@@ -44,28 +44,28 @@ export const DEFAULT_SETTINGS: SimSettings = {
   dustCount: 850,
   dustOpacity: 0.18,
   dustSize: 0.085,
-  fogDensity: 0.0016,
-  fogColor: '#cbb389',
+  fogDensity: 0.0009,
+  fogColor: '#cfc3a4',
 
   sunAzimuth: 210,
   sunElevation: 35,
-  sunIntensity: 3.25,
-  skyTurbidity: 5.2,
-  skyRayleigh: 2.75,
+  sunIntensity: 4.6,
+  skyTurbidity: 3.6,
+  skyRayleigh: 2.0,
   bloomIntensity: 0.035,
   ambientIntensity: 0.1,
   shadowRes: 4096,
 
   cameraMode: 'follow',
-  cameraFov: 50,
-  cameraDamping: 0.06,
+  cameraFov: 52,
+  cameraDamping: 0.05,
   orbitSpeed: 0.12,
-  followDistance: 15,
-  followHeight: 12,
+  followDistance: 22,
+  followHeight: 10,
 
   robotSpeed: 12,
 
-  terrainSegments: 128,
+  terrainSegments: 256,
 };
 
 /**

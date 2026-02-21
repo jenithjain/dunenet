@@ -203,10 +203,10 @@ export default function SettingsPanel({
           <Slider label="Rough Terrain" value={s.roughDensity} min={0.02} max={0.3} step={0.01} onChange={(v) => set({ roughDensity: v })} />
 
           <div style={{ height: 4 }} />
-          <Slider label="Dust Count" value={s.dustCount} min={0} max={3000} step={50} onChange={(v) => set({ dustCount: v })} />
-          <Slider label="Dust Opacity" value={s.dustOpacity} min={0} max={0.5} step={0.01} onChange={(v) => set({ dustOpacity: v })} />
-          <Slider label="Dust Size" value={s.dustSize} min={0.02} max={0.25} step={0.005} onChange={(v) => set({ dustSize: v })} />
-          <Slider label="Fog Density" value={s.fogDensity} min={0} max={0.006} step={0.0001} onChange={(v) => set({ fogDensity: v })} />
+          <Slider label="Dust Count" value={s.dustCount} min={0} max={6000} step={100} onChange={(v) => set({ dustCount: v })} />
+          <Slider label="Dust Opacity" value={s.dustOpacity} min={0} max={0.85} step={0.01} onChange={(v) => set({ dustOpacity: v })} />
+          <Slider label="Dust Size" value={s.dustSize} min={0.02} max={0.45} step={0.005} onChange={(v) => set({ dustSize: v })} />
+          <Slider label="Fog Density" value={s.fogDensity} min={0} max={0.02} step={0.0002} onChange={(v) => set({ fogDensity: v })} />
 
           {/* ── Lighting / Sky ── */}
           <SectionHeader title="Lighting & Sky" />

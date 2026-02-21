@@ -31,8 +31,8 @@ export default function Lighting({
   ambientIntensity = 0.1,
   fogDensity = 0.0016,
   fogColor = '#cbb389',
-  skyTurbidity = 2.8,
-  skyRayleigh = 1.55,
+  skyTurbidity = 5.2,
+  skyRayleigh = 2.75,
   shadowRes = 4096,
 }: LightingProps) {
   const dirLightRef = useRef<THREE.DirectionalLight>(null);
@@ -49,52 +49,52 @@ export default function Lighting({
         sunPosition={sunPosition}
         turbidity={skyTurbidity}
         rayleigh={skyRayleigh}
-        mieCoefficient={0.0025}
-        mieDirectionalG={0.8}
+        mieCoefficient={0.005}
+        mieDirectionalG={0.85}
         distance={450000}
       />
 
       <Environment preset="park" background={false} environmentIntensity={0.36} />
 
-      {/* Sparse cumulus cloud layer */}
-      <Clouds limit={180} range={150}>
+      {/* Volumetric cloud layer */}
+      <Clouds material={THREE.MeshBasicMaterial} limit={400}>
         <Cloud
           seed={12}
-          bounds={[155, 10, 155]}
-          volume={52}
-          segments={70}
+          bounds={[120, 8, 120]}
+          volume={40}
+          segments={80}
           color="#ffffff"
-          fade={200}
-          position={[-8, 76, -18]}
-          opacity={0.62}
-          growth={7}
-          speed={0.045}
+          fade={250}
+          position={[0, 65, 0]}
+          opacity={0.85}
+          growth={6}
+          speed={0.15}
           concentrate="outside"
         />
         <Cloud
           seed={37}
-          bounds={[130, 8, 130]}
-          volume={28}
-          segments={52}
-          color="#f8f8f8"
-          fade={175}
-          position={[52, 82, 24]}
-          opacity={0.52}
-          growth={5}
-          speed={0.035}
+          bounds={[100, 5, 100]}
+          volume={25}
+          segments={50}
+          color="#f5f0ea"
+          fade={200}
+          position={[40, 72, -30]}
+          opacity={0.65}
+          growth={4}
+          speed={0.1}
           concentrate="random"
         />
         <Cloud
           seed={55}
-          bounds={[110, 7, 110]}
-          volume={20}
-          segments={42}
-          color="#f6f6f6"
-          fade={165}
-          position={[-62, 70, 42]}
-          opacity={0.42}
-          growth={4}
-          speed={0.03}
+          bounds={[80, 4, 80]}
+          volume={18}
+          segments={35}
+          color="#faf5ef"
+          fade={180}
+          position={[-50, 60, 40]}
+          opacity={0.5}
+          growth={3}
+          speed={0.08}
         />
       </Clouds>
 
