@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AdaptiveDpr, AdaptiveEvents, Preload, Stats } from '@react-three/drei';
 import {
   EffectComposer,
@@ -20,6 +20,13 @@ import CameraController from './CameraController';
 import GoalMarker from './GoalMarker';
 import DustParticles from './DustParticles';
 import MiniMap from './MiniMap';
+import SettingsPanel from './SettingsPanel';
+import {
+  type SimSettings,
+  DEFAULT_SETTINGS,
+  simSettings,
+  sunPositionFromAngles,
+} from './simulationSettings';
 
 import { astar, smoothPath, type PathPoint } from './utils/astar';
 import {
@@ -85,7 +92,7 @@ function RobotController({
     }
 
     // Move along path points
-    const speed = 12; // world units per second
+    const speed = simSettings.robotSpeed;
     const step = Math.max(1, Math.floor(path.length / 200));
 
     let idx = pathIdx.current;
@@ -153,11 +160,16 @@ function UISync({
 }
 
 // ── Post Processing (lightweight – no SSAO to avoid context loss) ──
-function PostProcessing() {
+function PostProcessing({ bloomIntensity = 0.035 }: { bloomIntensity?: number }) {
+  const { gl } = useThree();
+  const attrs = gl.getContextAttributes?.();
+
+  if (!attrs || gl.isContextLost?.()) return null;
+
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={0}>
       <Bloom
-        intensity={0.035}
+        intensity={bloomIntensity}
         luminanceThreshold={0.93}
         luminanceSmoothing={0.25}
         mipmapBlur
@@ -186,15 +198,33 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   const [showSegmentation, setShowSegmentation] = useState(false);
   const [showCostmap, setShowCostmap] = useState(false);
-  const [orbitCamera, setOrbitCamera] = useState(false);
   const [contextLost, setContextLost] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasReachedGoal, setHasReachedGoal] = useState(false);
   const [simStatus, setSimStatus] = useState('Initializing...');
 
+  // ── Simulation settings ──
+  const [settings, setSettingsState] = useState<SimSettings>({ ...DEFAULT_SETTINGS });
+  const [densityKey, setDensityKey] = useState(0);
+
   const contextRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasListenersCleanupRef = useRef<(() => void) | null>(null);
+
+  // Merge settings patch & sync mutable store
+  const updateSettings = useCallback((patch: Partial<SimSettings>) => {
+    setSettingsState((prev) => {
+      const next = { ...prev, ...patch };
+      Object.assign(simSettings, next);
+      return next;
+    });
+  }, []);
+
+  // Derived sun position
+  const sunPos = useMemo<[number, number, number]>(
+    () => sunPositionFromAngles(settings.sunAzimuth, settings.sunElevation),
+    [settings.sunAzimuth, settings.sunElevation],
+  );
 
   // Goal position in grid coords
   const [goalGrid, setGoalGrid] = useState<PathPoint>({ x: GRID_SIZE - 20, y: GRID_SIZE - 20 });
@@ -213,13 +243,13 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     return [wx, wy, wz];
   }, [goalGrid]);
 
-  // Generate costmap on mount
+  // Generate costmap on mount or when density settings change
   useEffect(() => {
     setSimStatus('Generating terrain costmap...');
-    const cm = generateProceduralCostmap(GRID_SIZE, GRID_SIZE, 0.035, 0.1, 42);
+    const cm = generateProceduralCostmap(GRID_SIZE, GRID_SIZE, settings.obstacleDensity, settings.roughDensity, 42 + densityKey);
     setCostmap(cm);
     setSimStatus('Costmap loaded. Computing path...');
-  }, []);
+  }, [densityKey, settings.obstacleDensity, settings.roughDensity]);
 
   // Compute path when costmap or goal changes
   useEffect(() => {
@@ -356,7 +386,16 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         <Preload all />
 
         {/* Lighting */}
-        <Lighting />
+        <Lighting
+          sunPosition={sunPos}
+          sunIntensity={settings.sunIntensity}
+          ambientIntensity={settings.ambientIntensity}
+          fogDensity={settings.fogDensity}
+          fogColor={settings.fogColor}
+          skyTurbidity={settings.skyTurbidity}
+          skyRayleigh={settings.skyRayleigh}
+          shadowRes={settings.shadowRes}
+        />
 
         {/* Terrain */}
         <Terrain
@@ -376,6 +415,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             costmapWidth={GRID_SIZE}
             costmapHeight={GRID_SIZE}
             worldSize={WORLD_SIZE}
+            densityScale={settings.obstacleDensity / DEFAULT_SETTINGS.obstacleDensity}
           />
         )}
 
@@ -413,15 +453,24 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         <GoalMarker position={goalWorldPos} />
 
         {/* Dust particles */}
-        <DustParticles />
+        <DustParticles
+          count={settings.dustCount}
+          opacity={settings.dustOpacity}
+          size={settings.dustSize}
+        />
 
         {/* Camera */}
         <CameraController
-          orbitMode={orbitCamera}
+          cameraMode={settings.cameraMode}
+          fov={settings.cameraFov}
+          damping={settings.cameraDamping}
+          orbitSpeed={settings.orbitSpeed}
+          followDistance={settings.followDistance}
+          followHeight={settings.followHeight}
         />
 
         {/* Post processing */}
-        <PostProcessing />
+        <PostProcessing bloomIntensity={settings.bloomIntensity} />
       </Canvas>
 
       {contextLost && (
@@ -564,12 +613,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         </button>
 
         <button
-          onClick={() => setOrbitCamera((v) => !v)}
+          onClick={() =>
+            updateSettings({ cameraMode: settings.cameraMode === 'fpv' ? 'follow' : 'fpv' })
+          }
           className="sim-btn"
           style={{
-            background: orbitCamera ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)',
-            border: `1px solid ${orbitCamera ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.1)'}`,
-            color: orbitCamera ? '#a855f7' : '#e2e8f0',
+            background: settings.cameraMode === 'fpv' ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)',
+            border: `1px solid ${settings.cameraMode === 'fpv' ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.1)'}`,
+            color: settings.cameraMode === 'fpv' ? '#a855f7' : '#e2e8f0',
             borderRadius: 8,
             padding: '6px 12px',
             fontSize: 11,
@@ -579,7 +630,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             textAlign: 'left',
           }}
         >
-          {orbitCamera ? '◉' : '○'} Orbit Camera
+          {settings.cameraMode === 'fpv' ? '◉' : '○'} First Person
         </button>
 
         <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
@@ -620,6 +671,16 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           ⊕ Random Goal
         </button>
       </div>
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        settings={settings}
+        onChange={updateSettings}
+        onRegenerateTerrain={() => {
+          setDensityKey((k) => k + 1);
+          handleResetRobot();
+        }}
+      />
 
       {/* Minimap */}
       {costmap && (
