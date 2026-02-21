@@ -17,11 +17,17 @@ export interface SimSettings {
   sunAzimuth: number;           // 0 – 360
   sunElevation: number;         // 5 – 85
   sunIntensity: number;         // 0.5 – 8
+  lightSourceBrightness: number; // 0.2 – 2.5
   skyTurbidity: number;         // 1 – 20
   skyRayleigh: number;          // 0 – 6
   bloomIntensity: number;       // 0 – 0.3
   ambientIntensity: number;     // 0 – 0.5
   shadowRes: number;            // 512 – 8192
+  shadowRadius: number;         // 0 – 8
+  shadowBias: number;           // -0.002 – 0
+  shadowNormalBias: number;     // 0 – 0.08
+  shadowCameraSize: number;     // 40 – 180
+  shadowFar: number;            // 120 – 420
 
   // ── Camera ──
   cameraMode: 'follow' | 'orbit' | 'fpv';
@@ -36,6 +42,8 @@ export interface SimSettings {
 
   // ── Terrain ──
   terrainSegments: number;      // 64 – 512
+  terrainRelief: number;        // 0.4 – 3.5
+  terrainHeightOffset: number;  // -8 – 8
 }
 
 export const DEFAULT_SETTINGS: SimSettings = {
@@ -50,11 +58,17 @@ export const DEFAULT_SETTINGS: SimSettings = {
   sunAzimuth: 210,
   sunElevation: 35,
   sunIntensity: 4.6,
+  lightSourceBrightness: 1.0,
   skyTurbidity: 3.6,
-  skyRayleigh: 2.0,
+  skyRayleigh: 0.05,
   bloomIntensity: 0.035,
   ambientIntensity: 0.1,
-  shadowRes: 4096,
+  shadowRes: 6144,
+  shadowRadius: 2.4,
+  shadowBias: -0.0003,
+  shadowNormalBias: 0.028,
+  shadowCameraSize: 96,
+  shadowFar: 320,
 
   cameraMode: 'follow',
   cameraFov: 52,
@@ -63,9 +77,11 @@ export const DEFAULT_SETTINGS: SimSettings = {
   followDistance: 22,
   followHeight: 10,
 
-  robotSpeed: 12,
+  robotSpeed: 2,
 
   terrainSegments: 256,
+  terrainRelief: 1.0,
+  terrainHeightOffset: 0,
 };
 
 /**

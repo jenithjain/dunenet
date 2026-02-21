@@ -18,9 +18,11 @@ export default function Robot({
   worldSize = 200,
 }: RobotProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const wheelRefs = useRef<THREE.Mesh[]>([]);
+  const wheelRefs = useRef<THREE.Group[]>([]);
+  const wheelAngles = useRef<number[]>([0, 0, 0, 0, 0, 0]);
   const prevPos = useRef(new THREE.Vector3(...robotState.position));
   const currentRot = useRef(robotState.rotation);
+  const wheelRadius = 0.3;
 
   // Smooth interpolated position — reads from robotState, NOT from React props
   useFrame((_, delta) => {
@@ -38,20 +40,29 @@ export default function Robot({
     currentRot.current += diff * Math.min(1, delta * 5);
     groupRef.current.rotation.y = currentRot.current;
 
-    // Animate wheel rotation when moving
-    if (robotState.moving) {
-      for (const wheel of wheelRefs.current) {
-        if (wheel) {
-          wheel.rotation.x += delta * 8;
-        }
+    // Physically-based wheel spin from signed travel distance
+    const movement = groupRef.current.position.clone().sub(prevPos.current);
+    const travel = movement.length();
+    if (travel > 1e-5) {
+      const forward = new THREE.Vector3(-Math.cos(currentRot.current), 0, Math.sin(currentRot.current));
+      const signedTravel = movement.dot(forward);
+      const spin = signedTravel / wheelRadius;
+
+      for (let i = 0; i < wheelRefs.current.length; i++) {
+        const wheelGroup = wheelRefs.current[i];
+        if (!wheelGroup) continue;
+        wheelAngles.current[i] += spin;
+        wheelGroup.rotation.set(0, 0, wheelAngles.current[i]);
       }
     }
 
     prevPos.current.copy(groupRef.current.position);
   });
 
-  const addWheelRef = (index: number) => (ref: THREE.Mesh | null) => {
-    if (ref) wheelRefs.current[index] = ref;
+  const addWheelRef = (index: number) => (ref: THREE.Group | null) => {
+    if (ref) {
+      wheelRefs.current[index] = ref;
+    }
   };
 
   // Body material
@@ -193,23 +204,17 @@ export default function Robot({
           <mesh material={antennaMat} position={[0, 0.15, pos[2] > 0 ? -0.15 : 0.15]}>
             <boxGeometry args={[0.15, 0.08, 0.3]} />
           </mesh>
-          {/* Wheel */}
-          <mesh
-            ref={addWheelRef(i)}
-            material={wheelMat}
-            castShadow
-            rotation={[Math.PI / 2, 0, 0]}
-          >
-            <cylinderGeometry args={[0.3, 0.3, 0.2, 16]} />
-          </mesh>
-          {/* Wheel hub */}
-          <mesh
-            rotation={[Math.PI / 2, 0, 0]}
-            position={[0, 0, pos[2] > 0 ? 0.11 : -0.11]}
-          >
-            <cylinderGeometry args={[0.12, 0.12, 0.02, 8]} />
-            <meshStandardMaterial color="#555" metalness={0.8} roughness={0.3} />
-          </mesh>
+          <group ref={addWheelRef(i)}>
+            {/* Wheel */}
+            <mesh material={wheelMat} castShadow rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.3, 0.3, 0.2, 16]} />
+            </mesh>
+            {/* Wheel hub */}
+            <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, pos[2] > 0 ? 0.11 : -0.11]}>
+              <cylinderGeometry args={[0.12, 0.12, 0.02, 8]} />
+              <meshStandardMaterial color="#555" metalness={0.8} roughness={0.3} />
+            </mesh>
+          </group>
         </group>
       ))}
 

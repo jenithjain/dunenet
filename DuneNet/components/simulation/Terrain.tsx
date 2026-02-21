@@ -8,6 +8,8 @@ import { createNoise2D } from 'simplex-noise';
 interface TerrainProps {
   size?: number;
   segments?: number;
+  terrainRelief?: number;
+  terrainHeightOffset?: number;
   costmapData?: number[][] | null;
   costmapWidth?: number;
   costmapHeight?: number;
@@ -18,6 +20,8 @@ interface TerrainProps {
 export default function Terrain({
   size = 320,
   segments = 256,
+  terrainRelief = 1,
+  terrainHeightOffset = 0,
   costmapData = null,
   costmapWidth = 256,
   costmapHeight = 256,
@@ -45,21 +49,29 @@ export default function Terrain({
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
+      const relief = THREE.MathUtils.clamp(terrainRelief, 0.4, 3.5);
+      const reliefCurve = Math.pow(relief, 1.65);
+      const reliefBoost = Math.max(0, reliefCurve - 1);
 
       // Multi-octave noise → semi-arid rolling hills
       let h = 0;
-      h += noise2D(x * 0.0025, z * 0.0025) * 2.2; // broad hills
-      h += noise2D(x * 0.008, z * 0.008) * 1.1; // medium bumps
-      h += noise2D(x * 0.03, z * 0.03) * 0.6; // small ripples
-      h += noise2D(x * 0.12, z * 0.12) * 0.22; // micro
+      h += noise2D(x * 0.0025, z * 0.0025) * (2.2 * (0.72 + reliefCurve * 0.42)); // broad hills
+      h += noise2D(x * 0.008, z * 0.008) * (1.1 * (0.74 + reliefCurve * 0.48)); // medium bumps
+      h += noise2D(x * 0.03, z * 0.03) * (0.6 * (0.64 + reliefCurve * 0.72)); // small ripples
+      h += noise2D(x * 0.12, z * 0.12) * (0.22 * (0.58 + reliefCurve * 1.05)); // micro
+
+      const ridgeRaw = 1 - Math.abs(noise2D(x * 0.0055, z * 0.0055));
+      const ridge = ridgeRaw * ridgeRaw;
+      h += ridge * reliefBoost * 4.8;
 
       // Directional slope (subtle hillside)
-      const slope = (z / (size * 0.5)) * 1.4;
+      const slope = (z / (size * 0.5)) * 1.4 * (0.85 + reliefCurve * 0.32);
       h += slope;
 
       // Soft edge falloff
       const d = Math.sqrt(x * x + z * z) / (size * 0.5);
       h *= Math.max(0, 1 - d * d * 0.55);
+      h += terrainHeightOffset;
 
       pos.setY(i, h);
 
@@ -83,7 +95,7 @@ export default function Terrain({
     geo.setAttribute('uv2', new THREE.BufferAttribute((geo.attributes.uv.array as Float32Array).slice(), 2));
     geo.computeVertexNormals();
     return geo;
-  }, [size, segments]);
+  }, [size, segments, terrainRelief, terrainHeightOffset]);
 
   const textures = useTexture({
     dirtColor: '/textures/terrain/ground103/Ground103_2K-JPG_Color.jpg',
@@ -230,23 +242,44 @@ export default function Terrain({
     c.width = costmapWidth; c.height = costmapHeight;
     const ctx = c.getContext('2d')!;
 
+    const toHeatColor = (value: number) => {
+      const t = THREE.MathUtils.clamp(value / 10, 0, 1);
+      // Viridis-like ramp (dark purple -> blue -> green -> yellow)
+      const colorStops = [
+        new THREE.Color('#440154'),
+        new THREE.Color('#31688e'),
+        new THREE.Color('#35b779'),
+        new THREE.Color('#fde725'),
+      ];
+      const scaled = t * (colorStops.length - 1);
+      const i = Math.min(colorStops.length - 2, Math.floor(scaled));
+      const f = scaled - i;
+      return colorStops[i].clone().lerp(colorStops[i + 1], f);
+    };
+
     for (let y = 0; y < costmapHeight; y++) {
       for (let x = 0; x < costmapWidth; x++) {
         const val = costmapData[y]?.[x] ?? 0;
         if (showSegmentation) {
-          if (val >= 10) ctx.fillStyle = 'rgba(220,38,38,0.7)';
-          else if (val >= 5) ctx.fillStyle = 'rgba(234,179,8,0.5)';
-          else ctx.fillStyle = 'rgba(34,197,94,0.3)';
+          if (val >= 10) ctx.fillStyle = 'rgba(220,38,38,0.92)';      // obstacle
+          else if (val >= 5) ctx.fillStyle = 'rgba(234,179,8,0.88)';  // rough
+          else ctx.fillStyle = 'rgba(34,197,94,0.84)';                // drivable
         } else {
-          const i = Math.min(255, val * 25);
-          ctx.fillStyle = `rgba(${i},${Math.max(0,100-i)},${Math.max(0,200-i*2)},0.6)`;
+          const heat = toHeatColor(val);
+          const r = Math.floor(heat.r * 255);
+          const g = Math.floor(heat.g * 255);
+          const b = Math.floor(heat.b * 255);
+          ctx.fillStyle = `rgba(${r},${g},${b},0.86)`;
         }
         ctx.fillRect(x, y, 1, 1);
       }
     }
 
     const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }, [costmapData, costmapWidth, costmapHeight, showSegmentation, showCostmap]);
 
@@ -260,7 +293,14 @@ export default function Terrain({
       {/* Overlay */}
       {overlayVisible && overlayTexture && (
         <mesh geometry={geometry} position={[0, 0.08, 0]}>
-          <meshBasicMaterial map={overlayTexture} transparent opacity={0.55} depthWrite={false} side={THREE.FrontSide} />
+          <meshBasicMaterial
+            map={overlayTexture}
+            transparent
+            opacity={showSegmentation ? 0.95 : 0.82}
+            depthWrite={false}
+            toneMapped={false}
+            side={THREE.FrontSide}
+          />
         </mesh>
       )}
     </group>

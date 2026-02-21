@@ -31,8 +31,9 @@ function Slider({
   unit?: string;
   onChange: (v: number) => void;
 }) {
+  const safeValue = Number.isFinite(value) ? value : min;
   const display =
-    step >= 1 ? value.toFixed(0) : step >= 0.01 ? value.toFixed(2) : value.toFixed(4);
+    step >= 1 ? safeValue.toFixed(0) : step >= 0.01 ? safeValue.toFixed(2) : safeValue.toFixed(4);
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex justify-between text-[10px]" style={{ color: '#94a3b8' }}>
@@ -47,7 +48,7 @@ function Slider({
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={safeValue}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="sim-slider"
         style={{ width: '100%', accentColor: '#3b82f6' }}
@@ -96,7 +97,7 @@ export default function SettingsPanel({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const s = settings;
+  const s = { ...DEFAULT_SETTINGS, ...settings };
   const set = onChange;
 
   return (
@@ -208,13 +209,39 @@ export default function SettingsPanel({
           <Slider label="Dust Size" value={s.dustSize} min={0.02} max={0.45} step={0.005} onChange={(v) => set({ dustSize: v })} />
           <Slider label="Fog Density" value={s.fogDensity} min={0} max={0.02} step={0.0002} onChange={(v) => set({ fogDensity: v })} />
 
+          {/* ── Terrain ── */}
+          <SectionHeader title="Terrain Shape" />
+          <Slider
+            label="Mountainousness"
+            value={s.terrainRelief}
+            min={0.4}
+            max={3.5}
+            step={0.05}
+            onChange={(v) => set({ terrainRelief: v })}
+          />
+          <Slider
+            label="Altitude Offset"
+            value={s.terrainHeightOffset}
+            min={-8}
+            max={8}
+            step={0.1}
+            onChange={(v) => set({ terrainHeightOffset: v })}
+          />
+
           {/* ── Lighting / Sky ── */}
           <SectionHeader title="Lighting & Sky" />
 
           <Slider label="Sun Azimuth" value={s.sunAzimuth} min={0} max={360} step={1} unit="°" onChange={(v) => set({ sunAzimuth: v })} />
           <Slider label="Sun Elevation" value={s.sunElevation} min={5} max={85} step={1} unit="°" onChange={(v) => set({ sunElevation: v })} />
           <Slider label="Sun Intensity" value={s.sunIntensity} min={0.5} max={8} step={0.1} onChange={(v) => set({ sunIntensity: v })} />
+          <Slider label="Light Brightness" value={s.lightSourceBrightness} min={0.2} max={2.5} step={0.05} onChange={(v) => set({ lightSourceBrightness: v })} />
           <Slider label="Ambient" value={s.ambientIntensity} min={0} max={0.5} step={0.01} onChange={(v) => set({ ambientIntensity: v })} />
+          <Slider label="Shadow Resolution" value={s.shadowRes} min={512} max={8192} step={256} onChange={(v) => set({ shadowRes: v })} />
+          <Slider label="Shadow Softness" value={s.shadowRadius} min={0} max={8} step={0.1} onChange={(v) => set({ shadowRadius: v })} />
+          <Slider label="Shadow Bias" value={s.shadowBias} min={-0.002} max={0} step={0.00005} onChange={(v) => set({ shadowBias: v })} />
+          <Slider label="Shadow Normal Bias" value={s.shadowNormalBias} min={0} max={0.08} step={0.001} onChange={(v) => set({ shadowNormalBias: v })} />
+          <Slider label="Shadow Coverage" value={s.shadowCameraSize} min={40} max={180} step={2} onChange={(v) => set({ shadowCameraSize: v })} />
+          <Slider label="Shadow Distance" value={s.shadowFar} min={120} max={420} step={5} onChange={(v) => set({ shadowFar: v })} />
           <Slider label="Sky Turbidity" value={s.skyTurbidity} min={1} max={20} step={0.1} onChange={(v) => set({ skyTurbidity: v })} />
           <Slider label="Sky Rayleigh" value={s.skyRayleigh} min={0} max={6} step={0.05} onChange={(v) => set({ skyRayleigh: v })} />
           <Slider label="Bloom" value={s.bloomIntensity} min={0} max={0.3} step={0.005} onChange={(v) => set({ bloomIntensity: v })} />

@@ -38,19 +38,33 @@ import {
 import { createNoise2D } from 'simplex-noise';import { robotState } from './robotState';
 // ── Terrain height helper (must match Terrain.tsx noise) ──
 const terrainNoise = createNoise2D(() => 0.5);
-function getTerrainHeight(wx: number, wz: number, worldSize: number = 320): number {
-  let h = 0;
-  h += terrainNoise(wx * 0.0025, wz * 0.0025) * 2.2;
-  h += terrainNoise(wx * 0.008, wz * 0.008) * 1.1;
-  h += terrainNoise(wx * 0.03, wz * 0.03) * 0.6;
-  h += terrainNoise(wx * 0.12, wz * 0.12) * 0.22;
+function getTerrainHeight(
+  wx: number,
+  wz: number,
+  worldSize: number = 320,
+  terrainRelief: number = 1,
+  terrainHeightOffset: number = 0,
+): number {
+  const relief = THREE.MathUtils.clamp(terrainRelief, 0.4, 3.5);
+  const reliefCurve = Math.pow(relief, 1.65);
+  const reliefBoost = Math.max(0, reliefCurve - 1);
 
-  const slope = (wz / (worldSize * 0.5)) * 1.4;
+  let h = 0;
+  h += terrainNoise(wx * 0.0025, wz * 0.0025) * (2.2 * (0.72 + reliefCurve * 0.42));
+  h += terrainNoise(wx * 0.008, wz * 0.008) * (1.1 * (0.74 + reliefCurve * 0.48));
+  h += terrainNoise(wx * 0.03, wz * 0.03) * (0.6 * (0.64 + reliefCurve * 0.72));
+  h += terrainNoise(wx * 0.12, wz * 0.12) * (0.22 * (0.58 + reliefCurve * 1.05));
+
+  const ridgeRaw = 1 - Math.abs(terrainNoise(wx * 0.0055, wz * 0.0055));
+  const ridge = ridgeRaw * ridgeRaw;
+  h += ridge * reliefBoost * 4.8;
+
+  const slope = (wz / (worldSize * 0.5)) * 1.4 * (0.85 + reliefCurve * 0.32);
   h += slope;
 
   const d = Math.sqrt(wx * wx + wz * wz) / (worldSize * 0.5);
   h *= Math.max(0, 1 - d * d * 0.55);
-  return h;
+  return h + terrainHeightOffset;
 }
 
 // ── Robot movement controller (inside Canvas) ──
@@ -59,12 +73,16 @@ function RobotController({
   costmap,
   path,
   worldSize,
+  terrainRelief,
+  terrainHeightOffset,
   onReachedGoal,
   resetTrigger,
 }: {
   costmap: CostmapData;
   path: PathPoint[];
   worldSize: number;
+  terrainRelief: number;
+  terrainHeightOffset: number;
   onReachedGoal: () => void;
   resetTrigger: number;
 }) {
@@ -80,13 +98,13 @@ function RobotController({
     if (path.length > 0) {
       const first = path[0];
       const [wx, wz] = gridToWorld(first.x, first.y, costmap.width, costmap.height, worldSize);
-      const wy = getTerrainHeight(wx, wz, worldSize);
+      const wy = getTerrainHeight(wx, wz, worldSize, terrainRelief, terrainHeightOffset);
       currentPos.current = [wx, wy + 0.6, wz];
       robotState.position = [wx, wy + 0.6, wz];
       robotState.rotation = 0;
       robotState.moving = false;
     }
-  }, [path, resetTrigger]);
+  }, [path, resetTrigger, terrainRelief, terrainHeightOffset]);
 
   useFrame((_, delta) => {
     if (path.length < 2 || reached.current) {
@@ -94,9 +112,8 @@ function RobotController({
       return;
     }
 
-    // Move along path points
+    // Move smoothly along path points
     const speed = simSettings.robotSpeed;
-    const step = Math.max(1, Math.floor(path.length / 200));
 
     let idx = pathIdx.current;
     if (idx >= path.length - 1) {
@@ -106,10 +123,11 @@ function RobotController({
       return;
     }
 
-    // Get target point
-    const tp = path[Math.min(idx + step, path.length - 1)];
+    // Slight look-ahead for smoother steering, but advance index one-by-one
+    const lookAhead = Math.max(1, Math.floor(path.length / 350));
+    const tp = path[Math.min(idx + lookAhead, path.length - 1)];
     const [twx, twz] = gridToWorld(tp.x, tp.y, costmap.width, costmap.height, worldSize);
-    const twy = getTerrainHeight(twx, twz, worldSize);
+    const twy = getTerrainHeight(twx, twz, worldSize, terrainRelief, terrainHeightOffset);
     targetPos.current = [twx, twy + 0.6, twz];
 
     // Direction
@@ -117,15 +135,16 @@ function RobotController({
     const dz = targetPos.current[2] - currentPos.current[2];
     const dist = Math.sqrt(dx * dx + dz * dz);
 
-    if (dist < 0.5) {
-      pathIdx.current = Math.min(idx + step, path.length - 1);
+    if (dist < 0.35) {
+      pathIdx.current = Math.min(idx + 1, path.length - 1);
       return;
     }
 
     const moveStep = Math.min(speed * delta, dist);
     const nx = currentPos.current[0] + (dx / dist) * moveStep;
     const nz = currentPos.current[2] + (dz / dist) * moveStep;
-    const ny = getTerrainHeight(nx, nz, worldSize) + 0.6;
+    const terrainY = getTerrainHeight(nx, nz, worldSize, terrainRelief, terrainHeightOffset) + 0.6;
+    const ny = THREE.MathUtils.lerp(currentPos.current[1], terrainY, Math.min(1, delta * 6));
 
     currentPos.current = [nx, ny, nz];
     // Rover's local "forward" is along negative-X, so use atan2(dz, -dx)
@@ -201,7 +220,9 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   const [showSegmentation, setShowSegmentation] = useState(false);
   const [showCostmap, setShowCostmap] = useState(false);
+  const [showOverlayUi, setShowOverlayUi] = useState(true);
   const [contextLost, setContextLost] = useState(false);
+  const [gpuSafeMode, setGpuSafeMode] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasReachedGoal, setHasReachedGoal] = useState(false);
@@ -249,9 +270,9 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   // Goal world position
   const goalWorldPos = useMemo<[number, number, number]>(() => {
     const [wx, wz] = gridToWorld(goalGrid.x, goalGrid.y, GRID_SIZE, GRID_SIZE, WORLD_SIZE);
-    const wy = getTerrainHeight(wx, wz, WORLD_SIZE);
+    const wy = getTerrainHeight(wx, wz, WORLD_SIZE, settings.terrainRelief, settings.terrainHeightOffset);
     return [wx, wy, wz];
-  }, [goalGrid]);
+  }, [goalGrid, settings.terrainRelief, settings.terrainHeightOffset]);
 
   // Generate costmap on mount or when density settings change
   useEffect(() => {
@@ -312,6 +333,9 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   }, []);
 
   const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    // Fresh renderer was created successfully; clear any stale recovery overlay.
+    setContextLost(false);
+
     if (canvasListenersCleanupRef.current) {
       canvasListenersCleanupRef.current();
       canvasListenersCleanupRef.current = null;
@@ -325,6 +349,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       e.preventDefault();
       console.warn('WebGL context lost – remounting renderer');
       setContextLost(true);
+      setGpuSafeMode(true);
 
       if (contextRestoreTimerRef.current) {
         clearTimeout(contextRestoreTimerRef.current);
@@ -332,12 +357,17 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
       contextRestoreTimerRef.current = setTimeout(() => {
         setCanvasKey((k) => k + 1);
+        // If browser doesn't emit contextrestored for the old canvas, ensure UI unblocks.
         setContextLost(false);
-      }, 600);
+      }, 1200);
     };
 
     const onContextRestored = () => {
       console.info('WebGL context restored');
+      if (contextRestoreTimerRef.current) {
+        clearTimeout(contextRestoreTimerRef.current);
+        contextRestoreTimerRef.current = null;
+      }
       setContextLost(false);
       gl.setSize(canvas.clientWidth, canvas.clientHeight);
     };
@@ -373,6 +403,23 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     [],
   );
 
+  // Keep rover grounded when terrain shape/offset changes, even if robot is idle.
+  useEffect(() => {
+    const [x, , z] = robotState.position;
+    const groundedY = getTerrainHeight(
+      x,
+      z,
+      WORLD_SIZE,
+      settings.terrainRelief,
+      settings.terrainHeightOffset,
+    ) + 0.6;
+
+    if (Number.isFinite(groundedY)) {
+      robotState.position = [x, groundedY, z];
+      setRobotPos([x, groundedY, z]);
+    }
+  }, [settings.terrainRelief, settings.terrainHeightOffset]);
+
   return (
     <div className={`relative w-full h-full ${className ?? ''}`}>
       {/* 3D Canvas */}
@@ -389,35 +436,43 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           failIfMajorPerformanceCaveat: false,
         }}
         camera={{ fov: settings.cameraFov, near: 0.1, far: 1200, position: [26, 12, 26] }}
-        dpr={[1, 1.35]}
+        dpr={gpuSafeMode ? [1, 1] : [1, 1.2]}
         style={{ background: '#87CEEB' }}
         onCreated={handleCanvasCreated}
       >
         <AdaptiveDpr pixelated />
         <AdaptiveEvents />
-        <Preload all />
+        {!gpuSafeMode && <Preload all />}
 
         {/* Lighting */}
         <Lighting
           sunPosition={sunPos}
           sunIntensity={settings.sunIntensity}
+          lightSourceBrightness={settings.lightSourceBrightness}
           ambientIntensity={settings.ambientIntensity}
           fogDensity={settings.fogDensity}
           fogColor={settings.fogColor}
           skyTurbidity={settings.skyTurbidity}
           skyRayleigh={settings.skyRayleigh}
           shadowRes={settings.shadowRes}
+          shadowRadius={settings.shadowRadius}
+          shadowBias={settings.shadowBias}
+          shadowNormalBias={settings.shadowNormalBias}
+          shadowCameraSize={settings.shadowCameraSize}
+          shadowFar={settings.shadowFar}
         />
 
         {/* Terrain */}
         <Terrain
           size={WORLD_SIZE}
           segments={settings.terrainSegments}
+          terrainRelief={settings.terrainRelief}
+          terrainHeightOffset={settings.terrainHeightOffset}
           costmapData={costmap?.data ?? null}
           costmapWidth={GRID_SIZE}
           costmapHeight={GRID_SIZE}
-          showSegmentation={showSegmentation}
-          showCostmap={showCostmap}
+          showSegmentation={showOverlayUi && showSegmentation}
+          showCostmap={showOverlayUi && showCostmap}
         />
 
         {/* Obstacles */}
@@ -427,14 +482,18 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             costmapWidth={GRID_SIZE}
             costmapHeight={GRID_SIZE}
             worldSize={WORLD_SIZE}
+            terrainRelief={settings.terrainRelief}
+            terrainHeightOffset={settings.terrainHeightOffset}
             densityScale={settings.obstacleDensity / DEFAULT_SETTINGS.obstacleDensity}
           />
         )}
 
         {/* Robot */}
-        <Robot
-          worldSize={WORLD_SIZE}
-        />
+        {showOverlayUi && (
+          <Robot
+            worldSize={WORLD_SIZE}
+          />
+        )}
 
         {/* Robot Controller */}
         {costmap && path.length > 0 && isRunning && (
@@ -442,6 +501,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             costmap={costmap}
             path={path}
             worldSize={WORLD_SIZE}
+            terrainRelief={settings.terrainRelief}
+            terrainHeightOffset={settings.terrainHeightOffset}
             onReachedGoal={handleReachedGoal}
             resetTrigger={resetTrigger}
           />
@@ -451,22 +512,24 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         <UISync onSync={handleUISync} />
 
         {/* Path visualization */}
-        {path.length > 0 && (
+        {showOverlayUi && path.length > 0 && (
           <PathVisualizer
             path={path}
             gridWidth={GRID_SIZE}
             gridHeight={GRID_SIZE}
             worldSize={WORLD_SIZE}
-            getTerrainHeight={(wx, wz) => getTerrainHeight(wx, wz, WORLD_SIZE)}
+            getTerrainHeight={(wx, wz) =>
+              getTerrainHeight(wx, wz, WORLD_SIZE, settings.terrainRelief, settings.terrainHeightOffset)
+            }
           />
         )}
 
         {/* Goal marker */}
-        <GoalMarker position={goalWorldPos} />
+        {showOverlayUi && <GoalMarker position={goalWorldPos} />}
 
         {/* Dust particles */}
         <DustParticles
-          count={settings.dustCount}
+          count={gpuSafeMode ? Math.max(900, Math.floor(settings.dustCount * 0.65)) : settings.dustCount}
           opacity={settings.dustOpacity}
           size={settings.dustSize}
           windStrength={0.6 + dustStormStrength * 0.55}
@@ -484,10 +547,29 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         />
 
         {/* Post processing */}
-        <PostProcessing bloomIntensity={settings.bloomIntensity} />
+        {!gpuSafeMode && !hasReachedGoal && <PostProcessing bloomIntensity={settings.bloomIntensity} />}
       </Canvas>
 
-      {contextLost && (
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+        <button
+          onClick={() => setShowOverlayUi((v) => !v)}
+          style={{
+            background: showOverlayUi ? 'rgba(0,0,0,0.55)' : 'rgba(34,197,94,0.3)',
+            border: `1px solid ${showOverlayUi ? 'rgba(255,255,255,0.14)' : 'rgba(34,197,94,0.55)'}`,
+            color: '#e2e8f0',
+            borderRadius: 10,
+            padding: '6px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            backdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+          }}
+        >
+          {showOverlayUi ? 'Hide UI' : 'Show UI'}
+        </button>
+      </div>
+
+      {showOverlayUi && contextLost && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none bg-black/35 backdrop-blur-[2px]">
           <div className="px-3 py-2 rounded-md text-xs font-mono text-white bg-black/50 border border-white/15">
             Restoring WebGL renderer...
@@ -496,6 +578,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       )}
 
       {/* ── Overlay UI ── */}
+      {showOverlayUi && (
+        <>
 
       {/* Top status bar */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 pointer-events-none z-10">
@@ -739,6 +823,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             Obstacle
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

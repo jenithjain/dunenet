@@ -12,8 +12,43 @@ interface ObstaclesProps {
   costmapHeight?: number;
   worldSize?: number;
   terrainSegments?: number;
+  terrainRelief?: number;
+  terrainHeightOffset?: number;
   /** overall density multiplier 0–2 (1 = default) */
   densityScale?: number;
+}
+
+function isFiniteNumber(value: number): boolean {
+  return Number.isFinite(value);
+}
+
+function sanitizePositionAttribute(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = geo.getAttribute('position');
+  if (!pos || !(pos instanceof THREE.BufferAttribute)) return geo;
+
+  const arr = pos.array as ArrayLike<number> & { [index: number]: number };
+  let changed = false;
+  for (let i = 0; i < pos.count; i++) {
+    const base = i * pos.itemSize;
+    const x = arr[base];
+    const y = arr[base + 1];
+    const z = arr[base + 2];
+
+    if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(z)) {
+      arr[base] = isFiniteNumber(x) ? x : 0;
+      arr[base + 1] = isFiniteNumber(y) ? y : 0;
+      arr[base + 2] = isFiniteNumber(z) ? z : 0;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    pos.needsUpdate = true;
+  }
+
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
 }
 
 /* Must match Terrain.tsx & Scene.tsx getTerrainHeight exactly */
@@ -22,19 +57,29 @@ function getTerrainHeight(
   x: number,
   z: number,
   worldSize: number,
+  terrainRelief: number,
+  terrainHeightOffset: number,
 ) {
-  let h = 0;
-  h += noise2D(x * 0.0025, z * 0.0025) * 2.2;
-  h += noise2D(x * 0.008, z * 0.008) * 1.1;
-  h += noise2D(x * 0.03, z * 0.03) * 0.6;
-  h += noise2D(x * 0.12, z * 0.12) * 0.22;
+  const relief = THREE.MathUtils.clamp(terrainRelief, 0.4, 3.5);
+  const reliefCurve = Math.pow(relief, 1.65);
+  const reliefBoost = Math.max(0, reliefCurve - 1);
 
-  const slope = (z / (worldSize * 0.5)) * 1.4;
+  let h = 0;
+  h += noise2D(x * 0.0025, z * 0.0025) * (2.2 * (0.72 + reliefCurve * 0.42));
+  h += noise2D(x * 0.008, z * 0.008) * (1.1 * (0.74 + reliefCurve * 0.48));
+  h += noise2D(x * 0.03, z * 0.03) * (0.6 * (0.64 + reliefCurve * 0.72));
+  h += noise2D(x * 0.12, z * 0.12) * (0.22 * (0.58 + reliefCurve * 1.05));
+
+  const ridgeRaw = 1 - Math.abs(noise2D(x * 0.0055, z * 0.0055));
+  const ridge = ridgeRaw * ridgeRaw;
+  h += ridge * reliefBoost * 4.8;
+
+  const slope = (z / (worldSize * 0.5)) * 1.4 * (0.85 + reliefCurve * 0.32);
   h += slope;
 
   const dist = Math.sqrt(x * x + z * z) / (worldSize * 0.5);
   const falloff = Math.max(0, 1 - dist * dist * 0.55);
-  return h * falloff;
+  return h * falloff + terrainHeightOffset;
 }
 
 function getTerrainSlope(
@@ -42,12 +87,14 @@ function getTerrainSlope(
   x: number,
   z: number,
   worldSize: number,
+  terrainRelief: number,
+  terrainHeightOffset: number,
 ) {
   const eps = 1.5;
-  const hL = getTerrainHeight(noise2D, x - eps, z, worldSize);
-  const hR = getTerrainHeight(noise2D, x + eps, z, worldSize);
-  const hD = getTerrainHeight(noise2D, x, z - eps, worldSize);
-  const hU = getTerrainHeight(noise2D, x, z + eps, worldSize);
+  const hL = getTerrainHeight(noise2D, x - eps, z, worldSize, terrainRelief, terrainHeightOffset);
+  const hR = getTerrainHeight(noise2D, x + eps, z, worldSize, terrainRelief, terrainHeightOffset);
+  const hD = getTerrainHeight(noise2D, x, z - eps, worldSize, terrainRelief, terrainHeightOffset);
+  const hU = getTerrainHeight(noise2D, x, z + eps, worldSize, terrainRelief, terrainHeightOffset);
   const dx = (hR - hL) / (2 * eps);
   const dz = (hU - hD) / (2 * eps);
   return Math.min(1, Math.sqrt(dx * dx + dz * dz));
@@ -90,7 +137,7 @@ function createRockGeometry(): THREE.BufferGeometry {
   }
 
   geo.computeVertexNormals();
-  return geo;
+  return sanitizePositionAttribute(geo);
 }
 
 /**
@@ -150,9 +197,9 @@ function createCactusGeometry(): THREE.BufferGeometry {
 
   const parts = [trunk, cap, armL1, armL2, armLC, elbowL, armR1, armR2, armRC, elbowR];
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return trunk;
+  if (!merged) return sanitizePositionAttribute(trunk);
   merged.computeVertexNormals();
-  return merged;
+  return sanitizePositionAttribute(merged);
 }
 
 /** Apply subtle radial rib displacement to a cylinder geometry */
@@ -174,76 +221,144 @@ function applyCactusRibs(geo: THREE.BufferGeometry, radialSegs: number, depth: n
  * No sphere blobs — all geometry is cylindrical/conical so ribs are prominent.
  */
 function createBarrelCactusGeometry(): THREE.BufferGeometry {
-  const RSEGS = 24; // must be divisible for clean ribs
-  const HSEGS = 10;
-  const RIB_DEPTH = 0.045;
+  const noise = createNoise2D(() => 0.58);
+  const parts: THREE.BufferGeometry[] = [];
 
-  // Main cylindrical body (open, capped separately for cleaner normals)
-  const body = new THREE.CylinderGeometry(0.19, 0.24, 0.58, RSEGS, HSEGS, true);
-  // Deep prominent ribs
-  const bPos = body.attributes.position;
-  for (let i = 0; i < bPos.count; i++) {
-    const x = bPos.getX(i);
-    const y = bPos.getY(i);
-    const z = bPos.getZ(i);
+  const trunk = new THREE.CylinderGeometry(0.12, 0.18, 1.45, 18, 16, false);
+  const tPos = trunk.attributes.position;
+  for (let i = 0; i < tPos.count; i++) {
+    const x = tPos.getX(i);
+    const y = tPos.getY(i);
+    const z = tPos.getZ(i);
     const angle = Math.atan2(z, x);
-    // 12 ribs with sharp sine ridges
-    const rib = Math.sin(angle * 12) * RIB_DEPTH;
-    // Ribs tighten near top (natural barrel taper)
-    const yNorm = (y + 0.29) / 0.58;
-    const taperRib = rib * (1.0 - yNorm * 0.3);
+    const yNorm = (y + 0.725) / 1.45;
+    const barkRib = Math.sin(angle * 10 + yNorm * 3.2) * 0.018;
+    const warp = noise(x * 3.8 + y * 0.5, z * 3.8 + y * 0.45) * 0.03;
+    const taper = 1.0 - yNorm * 0.2;
     const len = Math.sqrt(x * x + z * z) || 1;
-    bPos.setXYZ(i, x + (x / len) * taperRib, y, z + (z / len) * taperRib);
+    tPos.setXYZ(
+      i,
+      x + (x / len) * (barkRib + warp) * taper,
+      y,
+      z + (z / len) * (barkRib + warp) * taper,
+    );
   }
+  trunk.translate(0, 0.72, 0);
+  parts.push(trunk);
 
-  // Dome top — shallow hemisphere, NOT a full sphere
-  const dome = new THREE.SphereGeometry(0.195, RSEGS, 6, 0, Math.PI * 2, 0, Math.PI * 0.42);
-  const dPos = dome.attributes.position;
-  for (let i = 0; i < dPos.count; i++) {
-    const x = dPos.getX(i);
-    const z = dPos.getZ(i);
-    const angle = Math.atan2(z, x);
-    const rib = Math.sin(angle * 12) * RIB_DEPTH * 0.7;
-    const len = Math.sqrt(x * x + z * z) || 1;
-    dPos.setXYZ(i, x + (x / len) * rib, dPos.getY(i), z + (z / len) * rib);
-  }
-  dome.translate(0, 0.29, 0);
+  const addRosette = (
+    baseX: number,
+    baseY: number,
+    baseZ: number,
+    spread: number,
+    seed: number,
+  ) => {
+    const leafCount = 20;
+    for (let i = 0; i < leafCount; i++) {
+      const a = (i / leafCount) * Math.PI * 2 + noise(seed * 0.7, i * 0.17) * 0.28;
+      const elev = 0.18 + Math.abs(noise(seed * 0.23, i * 0.39)) * 0.72;
+      const dir = new THREE.Vector3(
+        Math.cos(a) * (0.8 + Math.abs(noise(seed * 0.5, i * 0.13)) * 0.35),
+        elev,
+        Math.sin(a) * (0.8 + Math.abs(noise(seed * 0.37, i * 0.29)) * 0.35),
+      ).normalize();
 
-  // Flat bottom disc
-  const bottom = new THREE.CircleGeometry(0.24, RSEGS);
-  bottom.rotateX(-Math.PI / 2);
-  bottom.translate(0, -0.29, 0);
+      const leafLen = 0.28 + Math.abs(noise(seed * 0.61, i * 0.11)) * 0.26;
+      const leaf = new THREE.ConeGeometry(0.013, leafLen, 6, 1);
+      leaf.translate(0, leafLen * 0.5, 0);
 
-  // Spine nodule rows — tiny flat discs along each rib ridge
-  const spineGeos: THREE.BufferGeometry[] = [];
-  const RIB_COUNT = 12;
-  const SPINE_ROWS = 5;
-  for (let rib = 0; rib < RIB_COUNT; rib++) {
-    const ribAngle = (rib / RIB_COUNT) * Math.PI * 2;
-    for (let row = 0; row < SPINE_ROWS; row++) {
-      const yPos = -0.22 + (row / (SPINE_ROWS - 1)) * 0.44;
-      const yNorm = (yPos + 0.29) / 0.58;
-      const r = 0.19 + RIB_DEPTH * (1.0 - yNorm * 0.3); // sit on rib surface
-      const spine = new THREE.CylinderGeometry(0.006, 0.009, 0.03, 4, 1);
-      spine.rotateX(Math.PI / 2);
-      spine.translate(
-        Math.cos(ribAngle) * r,
-        yPos,
-        Math.sin(ribAngle) * r,
+      const q = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dir,
       );
-      const sm = new THREE.Matrix4().makeRotationY(ribAngle);
-      spine.applyMatrix4(sm);
-      spineGeos.push(spine);
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(baseX, baseY, baseZ),
+        q,
+        new THREE.Vector3(spread, 1, spread),
+      );
+      leaf.applyMatrix4(m);
+      parts.push(leaf);
+    }
+  };
+
+  const branchCount = 6;
+  for (let i = 0; i < branchCount; i++) {
+    const a = (i / branchCount) * Math.PI * 2 + noise(i * 0.43, 0.7) * 0.35;
+    const len = 0.62 + Math.abs(noise(i * 0.91, 1.4)) * 0.5;
+    const radiusTop = 0.036;
+    const radiusBottom = 0.068;
+    const branch = new THREE.CylinderGeometry(radiusTop, radiusBottom, len, 14, 10, false);
+    const bPos = branch.attributes.position;
+    for (let v = 0; v < bPos.count; v++) {
+      const x = bPos.getX(v);
+      const y = bPos.getY(v);
+      const z = bPos.getZ(v);
+      const yNorm = (y + len * 0.5) / len;
+      const bend = Math.pow(yNorm, 1.6) * (0.055 + Math.abs(noise(i * 0.8, y * 0.9)) * 0.04);
+      const angle = Math.atan2(z, x);
+      const corrugation = Math.sin(angle * 8 + yNorm * 2.6) * 0.012;
+      const radialLen = Math.sqrt(x * x + z * z) || 1;
+      bPos.setXYZ(
+        v,
+        x + Math.cos(a) * bend + (x / radialLen) * corrugation,
+        y,
+        z + Math.sin(a) * bend + (z / radialLen) * corrugation,
+      );
+    }
+
+    branch.translate(0, len * 0.5, 0);
+    const branchTilt = 0.8 + Math.abs(noise(i * 1.2, 2.3)) * 0.22;
+    const attachY = 0.84 + Math.abs(noise(i * 0.55, 3.4)) * 0.4;
+    const attachR = 0.08 + Math.abs(noise(i * 0.31, 0.6)) * 0.06;
+    const bm = new THREE.Matrix4()
+      .makeRotationY(a)
+      .multiply(new THREE.Matrix4().makeRotationZ(branchTilt));
+    bm.setPosition(Math.cos(a) * attachR, attachY, Math.sin(a) * attachR);
+    branch.applyMatrix4(bm);
+    parts.push(branch);
+
+    const tipX = Math.cos(a) * (attachR + Math.sin(branchTilt) * len * 0.86);
+    const tipY = attachY + Math.cos(branchTilt) * len * 0.86;
+    const tipZ = Math.sin(a) * (attachR + Math.sin(branchTilt) * len * 0.86);
+    addRosette(tipX, tipY, tipZ, 0.86, i * 10.7 + 1.3);
+
+    if (i % 2 === 0) {
+      const midX = Math.cos(a) * (attachR + Math.sin(branchTilt) * len * 0.48);
+      const midY = attachY + Math.cos(branchTilt) * len * 0.48;
+      const midZ = Math.sin(a) * (attachR + Math.sin(branchTilt) * len * 0.48);
+      addRosette(midX, midY, midZ, 0.58, i * 7.1 + 0.4);
     }
   }
-  const spines = mergeGeometries(spineGeos.map(g => g.index ? g.toNonIndexed() : g));
 
-  const parts: THREE.BufferGeometry[] = [body, dome, bottom];
-  if (spines) parts.push(spines);
+  addRosette(0, 1.7, 0, 0.92, 99.3);
+
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return body;
+  if (!merged) return sanitizePositionAttribute(trunk);
+
+  const pos = merged.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const trunkDark = new THREE.Color('#4c5b2c');
+  const trunkLight = new THREE.Color('#708649');
+  const leafBase = new THREE.Color('#5e7f2f');
+  const leafTip = new THREE.Color('#8aab44');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const radial = Math.sqrt(x * x + z * z);
+    const n = noise(x * 0.9 + y * 0.15, z * 0.9 + y * 0.15) * 0.5 + 0.5;
+    const isLeafZone = y > 1.25 || radial > 0.32;
+    const c = isLeafZone
+      ? leafBase.clone().lerp(leafTip, THREE.MathUtils.clamp((y - 1.25) / 1.2, 0, 1) * 0.7 + n * 0.3)
+      : trunkDark.clone().lerp(trunkLight, THREE.MathUtils.clamp(y / 1.7, 0, 1) * 0.75 + n * 0.25);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
   merged.computeVertexNormals();
-  return merged;
+  return sanitizePositionAttribute(merged);
 }
 
 /**
@@ -326,7 +441,7 @@ function createBushGeometry(): THREE.BufferGeometry {
   }
 
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return stump;
+  if (!merged) return sanitizePositionAttribute(stump);
 
   const pos = merged.attributes.position;
   const colors = new Float32Array(pos.count * 3);
@@ -355,7 +470,7 @@ function createBushGeometry(): THREE.BufferGeometry {
   merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   merged.computeVertexNormals();
-  return merged;
+  return sanitizePositionAttribute(merged);
 }
 
 /**
@@ -405,7 +520,7 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
 
   // Add vertex color gradient: golden base → lighter tip
   const merged = mergeGeometries(blades.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return blades[0];
+  if (!merged) return sanitizePositionAttribute(blades[0]);
 
   const mergedPos = merged.attributes.position;
   const colors = new Float32Array(mergedPos.count * 3);
@@ -426,7 +541,7 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
   merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   merged.computeVertexNormals();
-  return merged;
+  return sanitizePositionAttribute(merged);
 }
 
 /**
@@ -435,7 +550,7 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
 function createPebbleGeometry(): THREE.BufferGeometry {
   const geo = new THREE.IcosahedronGeometry(0.18, 0);
   geo.scale(1.2, 0.6, 1.0);
-  return geo;
+  return sanitizePositionAttribute(geo);
 }
 
 /**
@@ -481,9 +596,9 @@ function createOcotilloGeometry(): THREE.BufferGeometry {
   if (branchMerged) parts.push(branchMerged);
 
   const merged = mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
-  if (!merged) return parts[0];
+  if (!merged) return sanitizePositionAttribute(parts[0]);
   merged.computeVertexNormals();
-  return merged;
+  return sanitizePositionAttribute(merged);
 }
 
 // ─── Procedural PBR material builders ──────────────────────────
@@ -600,36 +715,14 @@ function createCactusMaterial(): THREE.MeshStandardMaterial {
 }
 
 function createBarrelCactusMaterial(): THREE.MeshStandardMaterial {
-  const TEX = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = TEX; canvas.height = TEX;
-  const ctx = canvas.getContext('2d')!;
-  const n = createNoise2D(() => 0.44);
-  const n2 = createNoise2D(() => 0.82);
-
-  for (let y = 0; y < TEX; y++) {
-    for (let x = 0; x < TEX; x++) {
-      const u = x / TEX, v = y / TEX;
-      // Vertical rib shading bands
-      const rib = Math.sin(u * Math.PI * 24) * 0.5 + 0.5;
-      const fine = n(u * 80, v * 80) * 0.5 + 0.5;
-      const macro = n2(u * 20, v * 20) * 0.5 + 0.5;
-      const c = rib * 0.5 + fine * 0.3 + macro * 0.2;
-      // Dark earthy green — ribs darker, ridges lighter
-      const r = Math.floor(28 + c * 32);
-      const g = Math.floor(62 + c * 48);
-      const b = Math.floor(18 + c * 20);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
-  const diffuse = new THREE.CanvasTexture(canvas);
-  diffuse.wrapS = diffuse.wrapT = THREE.RepeatWrapping;
-  diffuse.colorSpace = THREE.SRGBColorSpace;
-
   return new THREE.MeshStandardMaterial({
-    map: diffuse, roughness: 0.7, metalness: 0.0, envMapIntensity: 0.2,
-    emissive: '#0f1f08', emissiveIntensity: 0.06,
+    color: '#6e8740',
+    roughness: 0.86,
+    metalness: 0.03,
+    envMapIntensity: 0.2,
+    emissive: '#13200a',
+    emissiveIntensity: 0.04,
+    vertexColors: true,
   });
 }
 
@@ -700,6 +793,8 @@ export default function Obstacles({
   costmapWidth = 256,
   costmapHeight = 256,
   worldSize = 200,
+  terrainRelief = 1,
+  terrainHeightOffset = 0,
   densityScale = 1,
 }: ObstaclesProps) {
   const rocksRef = useRef<THREE.InstancedMesh>(null);
@@ -765,45 +860,56 @@ export default function Obstacles({
       for (let gx = 0; gx < costmapWidth; gx += step) {
         const val = costmapData[gy]?.[gx] ?? 0;
         const [wx, wz] = gridToWorld(gx, gy, costmapWidth, costmapHeight, worldSize);
+        if (!isFiniteNumber(wx) || !isFiniteNumber(wz)) continue;
         const jitterX = (hash2(gx, gy) - 0.5) * 1.7;
         const jitterZ = (hash2(gy, gx) - 0.5) * 1.7;
         const px = wx + jitterX;
         const pz = wz + jitterZ;
+        if (!isFiniteNumber(px) || !isFiniteNumber(pz)) continue;
         const densityNoise = noise2D(px * 0.025, pz * 0.025) * 0.5 + 0.5;
         const clusterNoise = noise2D(px * 0.012, pz * 0.012) * 0.5 + 0.5;
         const patchNoise = noise2D(px * 0.004, pz * 0.004) * 0.5 + 0.5;
         const patchMask = THREE.MathUtils.smoothstep(patchNoise, 0.45, 0.78);
         const ds = densityScale;
-        const height = getTerrainHeight(noise2D, px, pz, worldSize);
-        const slope = getTerrainSlope(noise2D, px, pz, worldSize);
+        if (!isFiniteNumber(ds)) continue;
+        const height = getTerrainHeight(noise2D, px, pz, worldSize, terrainRelief, terrainHeightOffset);
+        const slope = getTerrainSlope(noise2D, px, pz, worldSize, terrainRelief, terrainHeightOffset);
+        if (!isFiniteNumber(height) || !isFiniteNumber(slope)) continue;
 
-        if (val >= 10 && hash2(gx + 9.3, gy - 2.1) > (1 - 0.35 * ds)) {
+        const isObstacleCell = val >= 10;
+        const isRoughCell = val >= 5 && val < 10;
+        const isSafeCell = val < 5;
+
+        if (isObstacleCell && hash2(gx + 9.3, gy - 2.1) > (1 - 0.35 * ds)) {
           const scale = 0.35 + (noise2D(px * 0.12, pz * 0.12) * 0.5 + 0.5) * 0.9;
           rockArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 6 && densityNoise > 0.6 && hash2(gx * 2.31, gy * 1.47) > (1 - 0.07 * ds)) {
+        // Large cacti should be non-drivable: only spawn on obstacle-class cells.
+        if (isObstacleCell && densityNoise > 0.45 && hash2(gx * 2.31, gy * 1.47) > (1 - 0.1 * ds)) {
           const scale = 1.0 + hash2(gx * 0.77, gy * 0.33) * 1.2;
           cactusArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 5 && densityNoise > 0.45 && hash2(gx * 3.17, gy * 2.53) > (1 - 0.05 * ds)) {
-          const scale = 0.55 + hash2(gx * 0.91, gy * 0.62) * 0.85;
+        // Joshua/barrel style large obstacle cluster: obstacle-class only.
+        if (isObstacleCell && densityNoise > 0.35 && hash2(gx * 3.17, gy * 2.53) > (1 - 0.08 * ds)) {
+          const scale = 0.72 + hash2(gx * 0.91, gy * 0.62) * 0.62;
           barrelArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 8 && clusterNoise > 0.6 && slope < 0.42 && hash2(gx * 4.11, gy * 3.07) > (1 - 0.02 * ds)) {
+        // Woody tall plants on rough areas (caution zones), not on fully safe cells.
+        if ((isObstacleCell || isRoughCell) && clusterNoise > 0.6 && slope < 0.42 && hash2(gx * 4.11, gy * 3.07) > (1 - 0.02 * ds)) {
           const scale = 0.9 + hash2(gx * 0.59, gy * 0.41) * 1.2;
           treeArr.push({ x: px, z: pz, scale });
         }
 
-        if (val < 9 && patchMask > 0.2 && densityNoise > (1 - 0.55 * ds) && hash2(gx * 1.91, gy * 0.83) > (1 - 0.48 * ds)) {
+        if (isRoughCell && patchMask > 0.2 && densityNoise > (1 - 0.55 * ds) && hash2(gx * 1.91, gy * 0.83) > (1 - 0.48 * ds)) {
           const scale = 0.65 + densityNoise * 1.15;
           bushArr.push({ x: px, z: pz, scale });
         }
 
         // Grass strands — tall golden blades in dense randomised spread patches
-        if (val < 7 && slope < 0.38 && height > -0.5 && height < 2.8) {
+        if (isSafeCell && slope < 0.38 && height > -0.5 && height < 2.8) {
           // Two-octave patch mask: large blobs × medium variation
           const fieldNoise  = noise2D(px * 0.014, pz * 0.014) * 0.5 + 0.5; // large patch scale
           const detailNoise = noise2D(px * 0.035, pz * 0.035) * 0.5 + 0.5; // break-up detail
@@ -837,7 +943,7 @@ export default function Obstacles({
         }
 
         // Pebble clusters — lower slope, everywhere but peaks
-        if (val < 9 && slope < 0.55 && height < 2.8) {
+        if (!isObstacleCell && slope < 0.55 && height < 2.8) {
           const pebbleChance = (0.28 + densityNoise * 0.2) * ds;
           if (hash2(gx * 7.07, gy * 5.33) > (1 - pebbleChance)) {
             const scale = 0.35 + hash2(gx * 0.18, gy * 0.41) * 0.6;
@@ -852,7 +958,9 @@ export default function Obstacles({
     const rMats: THREE.Matrix4[] = [];
     const rCols: THREE.Color[] = [];
     for (const { x, z, scale } of rockArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       dummy.position.set(x, ty + scale * 0.18, z);
       dummy.rotation.set(
         noise2D(x * 0.3, z * 0.2) * 0.35,
@@ -873,7 +981,9 @@ export default function Obstacles({
     const cMats: THREE.Matrix4[] = [];
     const cCols: THREE.Color[] = [];
     for (const { x, z, scale } of cactusArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       dummy.position.set(x, ty, z);
       dummy.rotation.set(0, noise2D(x * 0.13, z * 0.13) * Math.PI * 2, 0);
       const scaleXZ = scale * (0.65 + hash2(x * 0.61, z * 0.71) * 0.7);
@@ -887,14 +997,16 @@ export default function Obstacles({
     const baMats: THREE.Matrix4[] = [];
     const baCols: THREE.Color[] = [];
     for (const { x, z, scale } of barrelArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
-      dummy.position.set(x, ty + scale * 0.15, z);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
+      dummy.position.set(x, ty, z);
       dummy.rotation.set(
         noise2D(x * 0.5, z * 0.3) * 0.08,
         noise2D(x * 0.2, z * 0.2) * Math.PI * 2,
         noise2D(x * 0.3, z * 0.5) * 0.08,
       );
-      dummy.scale.setScalar(scale);
+      dummy.scale.setScalar(scale * 0.9);
       dummy.updateMatrix();
       baMats.push(dummy.matrix.clone());
       const cn = hash2(x * 0.3, z * 0.3);
@@ -904,7 +1016,9 @@ export default function Obstacles({
     const tMats: THREE.Matrix4[] = [];
     const tCols: THREE.Color[] = [];
     for (const { x, z, scale } of treeArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       dummy.position.set(x, ty, z);
       dummy.rotation.set(
         noise2D(x * 0.4, z * 0.15) * 0.1,
@@ -921,8 +1035,11 @@ export default function Obstacles({
     const bMats: THREE.Matrix4[] = [];
     const bCols: THREE.Color[] = [];
     for (const { x, z, scale } of bushArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       const height = scale * (0.5 + hash2(x * 0.41, z * 0.77) * 0.8);
+      if (!isFiniteNumber(height)) continue;
       // Raise bushes so branching base clears terrain surface
       dummy.position.set(x, ty + scale * 0.28, z);
       dummy.rotation.set(0, noise2D(x * 0.09, z * 0.09) * Math.PI, noise2D(x * 0.4, z * 0.22) * 0.06);
@@ -938,8 +1055,11 @@ export default function Obstacles({
     const gMats: THREE.Matrix4[] = [];
     const gCols: THREE.Color[] = [];
     for (const { x, z, scale } of grassArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       const rotY = noise2D(x * 0.2, z * 0.2) * Math.PI;
+      if (!isFiniteNumber(rotY)) continue;
       // Place base exactly on terrain — no vertical offset since blade base is at y=0
       dummy.position.set(x, ty, z);
       dummy.rotation.set(0, rotY, noise2D(x * 0.6, z * 0.4) * 0.04);
@@ -953,7 +1073,9 @@ export default function Obstacles({
     const pMats: THREE.Matrix4[] = [];
     const pCols: THREE.Color[] = [];
     for (const { x, z, scale } of pebbleArr) {
-      const ty = getTerrainHeight(noise2D, x, z, worldSize);
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
       dummy.position.set(x, ty + scale * 0.05, z);
       dummy.rotation.set(
         noise2D(x * 0.4, z * 0.2) * 0.3,
@@ -976,7 +1098,7 @@ export default function Obstacles({
       grassMatrices: gMats, grassColors: gCols,
       pebbleMatrices: pMats, pebbleColors: pCols,
     };
-  }, [costmapData, costmapWidth, costmapHeight, worldSize, densityScale]);
+  }, [costmapData, costmapWidth, costmapHeight, worldSize, terrainRelief, terrainHeightOffset, densityScale]);
 
   const rockCount = rockMatrices.length;
   const cactusCount = cactusMatrices.length;
