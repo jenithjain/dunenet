@@ -22,6 +22,7 @@ import DustParticles from './DustParticles';
 import MiniMap from './MiniMap';
 import SettingsPanel from './SettingsPanel';
 import LiveInferencePanel, { type InferenceResult } from './LiveInferencePanel';
+import RoverChat from './RoverChat';
 import {
   type SimSettings,
   DEFAULT_SETTINGS,
@@ -125,6 +126,8 @@ function RobotController({
   useFrame((_, delta) => {
     if (path.length < 2 || reached.current) {
       robotState.moving = false;
+      robotState.pathIdx = pathIdx.current;
+      robotState.pathLength = path.length;
       return;
     }
 
@@ -170,6 +173,8 @@ function RobotController({
     robotState.position = [nx, ny, nz];
     robotState.rotation = rot;
     robotState.moving = true;
+    robotState.pathIdx = pathIdx.current;
+    robotState.pathLength = path.length;
   });
 
   return null;
@@ -180,7 +185,7 @@ function RobotController({
 function UISync({
   onSync,
 }: {
-  onSync: (pos: [number, number, number], rot: number, moving: boolean) => void;
+  onSync: (pos: [number, number, number], rot: number, moving: boolean, pathIdx: number, pathLength: number) => void;
 }) {
   const elapsed = useRef(0);
   useFrame((_, delta) => {
@@ -191,6 +196,8 @@ function UISync({
         [...robotState.position] as [number, number, number],
         robotState.rotation,
         robotState.moving,
+        robotState.pathIdx,
+        robotState.pathLength,
       );
     }
   });
@@ -232,6 +239,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   const [robotPos, setRobotPos] = useState<[number, number, number]>([0, 2, 0]);
   const [robotRot, setRobotRot] = useState(0);
   const [robotMoving, setRobotMoving] = useState(false);
+  const [robotPathIdx, setRobotPathIdx] = useState(0);
+  const [robotPathLength, setRobotPathLength] = useState(0);
   const [resetTrigger, setResetTrigger] = useState(0);
 
   const [showSegmentation, setShowSegmentation] = useState(false);
@@ -338,6 +347,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     setResetTrigger((t) => t + 1);
     setHasReachedGoal(false);
     setIsRunning(true);
+    setRobotPathIdx(0);
     setSimStatus('Robot reset. Navigating...');
   }, []);
 
@@ -543,10 +553,12 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   // Throttled sync callback — called at ~5 Hz from UISync inside the Canvas
   const handleUISync = useCallback(
-    (pos: [number, number, number], rot: number, moving: boolean) => {
+    (pos: [number, number, number], rot: number, moving: boolean, pathIdx: number, pathLength: number) => {
       setRobotPos(pos);
       setRobotRot(rot);
       setRobotMoving(moving);
+      setRobotPathIdx(pathIdx);
+      setRobotPathLength(pathLength);
     },
     [],
   );
@@ -1030,6 +1042,26 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         inferenceCount={inferenceCount}
         isProcessing={isInferencing}
         error={inferenceError}
+      />
+
+      {/* Rover Chat Interface */}
+      <RoverChat
+        roverStatus={{
+          position: robotPos,
+          goalPosition: goalWorldPos,
+          obstaclesCleared: robotPathIdx > 0 ? Math.floor(robotPathIdx / 15) : 0,
+          isMoving: robotMoving,
+          batteryLevel: robotPathLength > 0
+            ? Math.max(20, Math.round(100 - (robotPathIdx / robotPathLength) * 40))
+            : 100,
+          currentTask: simStatus,
+          speed: simSettings.robotSpeed,
+          estimatedTimeToGoal: (robotMoving && robotPathLength > 0)
+            ? Math.max(0, Math.round((robotPathLength - robotPathIdx) * 0.35 / simSettings.robotSpeed))
+            : null,
+          pathProgress: robotPathLength > 0 ? robotPathIdx / robotPathLength : 0,
+          pathLength: robotPathLength,
+        }}
       />
     </div>
   );

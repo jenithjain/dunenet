@@ -13,4 +13,6 @@ export const robotState = {
   position: [0, 0.6, 0] as [number, number, number],
   rotation: 0,
   moving: false,
+  pathIdx: 0,
+  pathLength: 0,
 };
