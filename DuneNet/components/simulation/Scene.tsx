@@ -634,6 +634,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             terrainRelief={settings.terrainRelief}
             terrainHeightOffset={settings.terrainHeightOffset}
             densityScale={settings.obstacleDensity / DEFAULT_SETTINGS.obstacleDensity}
+            rockDensity={settings.rockDensity}
+            cactusDensity={settings.cactusDensity}
+            barrelCactusDensity={settings.barrelCactusDensity}
+            bushDensity={settings.bushDensity}
+            ocotilloDensity={settings.ocotilloDensity}
+            grassDensity={settings.grassDensity}
+            pebbleDensity={settings.pebbleDensity}
+            joshuaTreeDensity={settings.joshuaTreeDensity}
           />
         )}
 

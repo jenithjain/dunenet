@@ -16,6 +16,15 @@ interface ObstaclesProps {
   terrainHeightOffset?: number;
   /** overall density multiplier 0–2 (1 = default) */
   densityScale?: number;
+  /** per-obstacle visual density multipliers (0 = none, 1 = default, 3 = dense) */
+  rockDensity?: number;
+  cactusDensity?: number;
+  barrelCactusDensity?: number;
+  bushDensity?: number;
+  ocotilloDensity?: number;
+  grassDensity?: number;
+  pebbleDensity?: number;
+  joshuaTreeDensity?: number;
 }
 
 function isFiniteNumber(value: number): boolean {
@@ -786,6 +795,197 @@ function createOcotilloMaterial(): THREE.MeshStandardMaterial {
   });
 }
 
+/**
+ * Tall desert Joshua Tree — thick bark trunk, multi-level branching,
+ * dense sword-leaf clusters at every tip. Scale ≈ 4 units at scale=1,
+ * so placement scale 1.5-2.5 gives 6-10 world-unit trees.
+ */
+function createJoshuaTreeGeometry(): THREE.BufferGeometry {
+  const noise = createNoise2D(() => 0.88);
+  const parts: THREE.BufferGeometry[] = [];
+
+  // ── Trunk ──
+  const trunk = new THREE.CylinderGeometry(0.21, 0.38, 4.0, 22, 12, false);
+  const tPos = trunk.attributes.position;
+  for (let i = 0; i < tPos.count; i++) {
+    const x = tPos.getX(i);
+    const y = tPos.getY(i);
+    const z = tPos.getZ(i);
+    const angle = Math.atan2(z, x);
+    const barkWarp =
+      noise(angle * 2.5, y * 0.5) * 0.048 +
+      noise(angle * 6.2, y * 1.4) * 0.022 +
+      noise(angle * 14, y * 3.0) * 0.010;
+    const fissure = Math.sin(angle * 9) * 0.014 + Math.sin(angle * 17) * 0.006;
+    const r = Math.sqrt(x * x + z * z) || 1;
+    tPos.setXYZ(
+      i,
+      x + (x / r) * (barkWarp + fissure),
+      y,
+      z + (z / r) * (barkWarp + fissure),
+    );
+  }
+  trunk.translate(0, 2.0, 0);
+  parts.push(trunk);
+
+  // ── Leaf-cluster builder ──
+  const makeLeafCluster = (
+    cx: number, cy: number, cz: number,
+    count = 28, leafLen = 0.38,
+  ) => {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + noise(cx + i * 0.31, cz + i * 0.17) * 0.5;
+      const elev =
+        (0.12 + Math.abs(noise(cx * 0.4 + i * 0.11, cz * 0.4 + i * 0.23)) * 0.88) *
+        Math.PI * 0.5;
+      const lLen = leafLen * (0.65 + Math.abs(noise(i * 0.61, cx * 0.11)) * 0.7);
+      const leaf = new THREE.ConeGeometry(0.016, lLen, 4, 1);
+      leaf.translate(0, lLen * 0.5, 0);
+      const dir = new THREE.Vector3(
+        Math.cos(a) * Math.cos(elev),
+        Math.sin(elev),
+        Math.sin(a) * Math.cos(elev),
+      ).normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      const spread = 0.13;
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(
+          cx + dir.x * spread,
+          cy + dir.y * spread,
+          cz + dir.z * spread,
+        ),
+        q,
+        new THREE.Vector3(1, 1, 1),
+      );
+      leaf.applyMatrix4(m);
+      parts.push(leaf);
+    }
+  };
+
+  // ── Main branches from upper trunk ──
+  const mainCount = 3 + Math.floor(Math.abs(noise(1.2, 0.7)) * 1.99); // 3-4
+  for (let i = 0; i < mainCount; i++) {
+    const a = (i / mainCount) * Math.PI * 2 + noise(i * 0.9, 0.7) * 0.4;
+    const tilt = 0.28 + Math.abs(noise(i * 0.5, 1.0)) * 0.22;
+    const bLen = 1.8 + Math.abs(noise(i * 0.7, 0.3)) * 1.05;
+    const bRadius = 0.11 + Math.abs(noise(i * 1.3, 0.8)) * 0.04;
+    const attachY = 3.0 + Math.abs(noise(i * 0.4, 0.2)) * 0.85;
+
+    const branch = new THREE.CylinderGeometry(bRadius * 0.52, bRadius, bLen, 14, 7, false);
+    const bPosArr = branch.attributes.position;
+    for (let v = 0; v < bPosArr.count; v++) {
+      const x = bPosArr.getX(v);
+      const y = bPosArr.getY(v);
+      const z = bPosArr.getZ(v);
+      const yNorm = (y + bLen * 0.5) / bLen;
+      const curve = Math.pow(Math.max(0, yNorm), 2.2) * 0.14;
+      const barkW = noise(x * 5.2 + i, z * 5.2 + y * 0.6 + i * 2.1) * 0.024;
+      const r = Math.sqrt(x * x + z * z) || 1;
+      bPosArr.setXYZ(
+        v,
+        x + Math.cos(a) * curve + (x / r) * barkW,
+        y,
+        z + Math.sin(a) * curve + (z / r) * barkW,
+      );
+    }
+    branch.translate(0, bLen * 0.5, 0);
+
+    const branchDir = new THREE.Vector3(
+      Math.cos(a) * Math.sin(tilt),
+      Math.cos(tilt),
+      Math.sin(a) * Math.sin(tilt),
+    ).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), branchDir);
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(Math.cos(a) * 0.19, attachY, Math.sin(a) * 0.19),
+      q,
+      new THREE.Vector3(1, 1, 1),
+    );
+    branch.applyMatrix4(m);
+    parts.push(branch);
+
+    const tipX = Math.cos(a) * 0.19 + branchDir.x * bLen;
+    const tipY = attachY + branchDir.y * bLen;
+    const tipZ = Math.sin(a) * 0.19 + branchDir.z * bLen;
+    makeLeafCluster(tipX, tipY, tipZ, 32, 0.42);
+
+    // Sub-branch
+    const subA = a + Math.PI * (0.45 + Math.abs(noise(i * 1.7, 0.5)) * 0.6);
+    const subTilt = 0.42 + Math.abs(noise(i * 2.1, 1.1)) * 0.28;
+    const subLen = bLen * 0.58;
+    const subT = 0.52 + Math.abs(noise(i * 0.8, 0.6)) * 0.26;
+    const subAX = Math.cos(a) * 0.19 + branchDir.x * bLen * subT;
+    const subAY = attachY + branchDir.y * bLen * subT;
+    const subAZ = Math.sin(a) * 0.19 + branchDir.z * bLen * subT;
+
+    const subBranch = new THREE.CylinderGeometry(bRadius * 0.30, bRadius * 0.40, subLen, 10, 5, false);
+    subBranch.translate(0, subLen * 0.5, 0);
+    const subDir = new THREE.Vector3(
+      Math.cos(subA) * Math.sin(subTilt),
+      Math.cos(subTilt) * 0.85,
+      Math.sin(subA) * Math.sin(subTilt),
+    ).normalize();
+    const sq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), subDir);
+    const sm = new THREE.Matrix4().compose(
+      new THREE.Vector3(subAX, subAY, subAZ),
+      sq,
+      new THREE.Vector3(1, 1, 1),
+    );
+    subBranch.applyMatrix4(sm);
+    parts.push(subBranch);
+
+    const stX = subAX + subDir.x * subLen;
+    const stY = subAY + subDir.y * subLen;
+    const stZ = subAZ + subDir.z * subLen;
+    makeLeafCluster(stX, stY, stZ, 22, 0.33);
+  }
+
+  const merged = mergeGeometries(parts.map(g => (g.index ? g.toNonIndexed() : g)));
+  if (!merged) return sanitizePositionAttribute(parts[0]);
+
+  // Vertex colours: bark → leaf gradient
+  const pos = merged.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const barkDark  = new THREE.Color('#3e2c18');
+  const barkLight = new THREE.Color('#7a5e34');
+  const leafBase  = new THREE.Color('#4a6118');
+  const leafTip   = new THREE.Color('#84aa2e');
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const radial = Math.sqrt(x * x + z * z);
+    const n = noise(x * 1.6 + y * 0.12, z * 1.6) * 0.5 + 0.5;
+    // Leaf zone: thin geometry high up
+    const isLeaf = (radial < 0.22 && y > 3.2) || y > 5.5;
+    let c: THREE.Color;
+    if (isLeaf) {
+      c = leafBase.clone().lerp(leafTip, THREE.MathUtils.clamp((y - 3.5) / 3.5, 0, 1) * 0.7 + n * 0.3);
+    } else {
+      c = barkDark.clone().lerp(barkLight, THREE.MathUtils.clamp(y / 4.2, 0, 1) * 0.8 + n * 0.2);
+    }
+    colors[i * 3]     = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  merged.computeVertexNormals();
+  return sanitizePositionAttribute(merged);
+}
+
+function createJoshuaTreeMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    roughness: 0.94,
+    metalness: 0.0,
+    envMapIntensity: 0.22,
+    emissive: '#0e1a04',
+    emissiveIntensity: 0.035,
+    vertexColors: true,
+    side: THREE.DoubleSide,
+  });
+}
+
 // ─── Component ─────────────────────────────────────────────────
 
 export default function Obstacles({
@@ -796,6 +996,14 @@ export default function Obstacles({
   terrainRelief = 1,
   terrainHeightOffset = 0,
   densityScale = 1,
+  rockDensity = 1,
+  cactusDensity = 1,
+  barrelCactusDensity = 1,
+  bushDensity = 1,
+  ocotilloDensity = 1,
+  grassDensity = 1,
+  pebbleDensity = 1,
+  joshuaTreeDensity = 1,
 }: ObstaclesProps) {
   const rocksRef = useRef<THREE.InstancedMesh>(null);
   const cactiRef = useRef<THREE.InstancedMesh>(null);
@@ -804,6 +1012,7 @@ export default function Obstacles({
   const treeRef = useRef<THREE.InstancedMesh>(null);
   const grassRef = useRef<THREE.InstancedMesh>(null);
   const pebbleRef = useRef<THREE.InstancedMesh>(null);
+  const joshuaRef = useRef<THREE.InstancedMesh>(null);
 
   const fract = (v: number) => v - Math.floor(v);
   const hash2 = (a: number, b: number) =>
@@ -816,6 +1025,7 @@ export default function Obstacles({
   const treeGeo = useMemo(() => createOcotilloGeometry(), []);
   const grassGeo = useMemo(() => createGrassClumpGeometry(), []);
   const pebbleGeo = useMemo(() => createPebbleGeometry(), []);
+  const joshuaGeo = useMemo(() => createJoshuaTreeGeometry(), []);
 
   const rockMat = useMemo(() => createRockMaterial(), []);
   const cactusMat = useMemo(() => createCactusMaterial(), []);
@@ -824,6 +1034,7 @@ export default function Obstacles({
   const treeMat = useMemo(() => createOcotilloMaterial(), []);
   const grassMat = useMemo(() => createGrassMaterial(), []);
   const pebbleMat = useMemo(() => createPebbleMaterial(), []);
+  const joshuaMat = useMemo(() => createJoshuaTreeMaterial(), []);
 
   const {
     rockMatrices, rockColors,
@@ -833,6 +1044,7 @@ export default function Obstacles({
     treeMatrices, treeColors,
     grassMatrices, grassColors,
     pebbleMatrices, pebbleColors,
+    joshuaMatrices, joshuaColors,
   } = useMemo(() => {
     if (!costmapData) {
       return {
@@ -843,6 +1055,7 @@ export default function Obstacles({
         treeMatrices: [] as THREE.Matrix4[], treeColors: [] as THREE.Color[],
         grassMatrices: [] as THREE.Matrix4[], grassColors: [] as THREE.Color[],
         pebbleMatrices: [] as THREE.Matrix4[], pebbleColors: [] as THREE.Color[],
+        joshuaMatrices: [] as THREE.Matrix4[], joshuaColors: [] as THREE.Color[],
       };
     }
 
@@ -854,6 +1067,7 @@ export default function Obstacles({
     const treeArr: { x: number; z: number; scale: number }[] = [];
     const grassArr: { x: number; z: number; scale: number }[] = [];
     const pebbleArr: { x: number; z: number; scale: number }[] = [];
+    const joshuaArr: { x: number; z: number; scale: number }[] = [];
 
     const step = 2;
     for (let gy = 0; gy < costmapHeight; gy += step) {
@@ -880,55 +1094,57 @@ export default function Obstacles({
         const isRoughCell = val >= 5 && val < 10;
         const isSafeCell = val < 5;
 
-        if (isObstacleCell && hash2(gx + 9.3, gy - 2.1) > (1 - 0.35 * ds)) {
+        if (isObstacleCell && hash2(gx + 9.3, gy - 2.1) > Math.max(0, 1 - 0.35 * ds * rockDensity)) {
           const scale = 0.35 + (noise2D(px * 0.12, pz * 0.12) * 0.5 + 0.5) * 0.9;
           rockArr.push({ x: px, z: pz, scale });
         }
 
-        // Large cacti should be non-drivable: only spawn on obstacle-class cells.
-        if (isObstacleCell && densityNoise > 0.45 && hash2(gx * 2.31, gy * 1.47) > (1 - 0.1 * ds)) {
+        // Large cacti — obstacle cells only
+        if (isObstacleCell && densityNoise > 0.45 && hash2(gx * 2.31, gy * 1.47) > Math.max(0, 1 - 0.1 * ds * cactusDensity)) {
           const scale = 1.0 + hash2(gx * 0.77, gy * 0.33) * 1.2;
           cactusArr.push({ x: px, z: pz, scale });
         }
 
-        // Joshua/barrel style large obstacle cluster: obstacle-class only.
-        if (isObstacleCell && densityNoise > 0.35 && hash2(gx * 3.17, gy * 2.53) > (1 - 0.08 * ds)) {
+        // Barrel cactus — obstacle cells only
+        if (isObstacleCell && densityNoise > 0.35 && hash2(gx * 3.17, gy * 2.53) > Math.max(0, 1 - 0.08 * ds * barrelCactusDensity)) {
           const scale = 0.72 + hash2(gx * 0.91, gy * 0.62) * 0.62;
           barrelArr.push({ x: px, z: pz, scale });
         }
 
-        // Woody tall plants on rough areas (caution zones), not on fully safe cells.
-        if ((isObstacleCell || isRoughCell) && clusterNoise > 0.6 && slope < 0.42 && hash2(gx * 4.11, gy * 3.07) > (1 - 0.02 * ds)) {
+        // Ocotillo — obstacle/rough, not too steep
+        if ((isObstacleCell || isRoughCell) && clusterNoise > 0.6 && slope < 0.42 && hash2(gx * 4.11, gy * 3.07) > Math.max(0, 1 - 0.02 * ds * ocotilloDensity)) {
           const scale = 0.9 + hash2(gx * 0.59, gy * 0.41) * 1.2;
           treeArr.push({ x: px, z: pz, scale });
         }
 
-        if (isRoughCell && patchMask > 0.2 && densityNoise > (1 - 0.55 * ds) && hash2(gx * 1.91, gy * 0.83) > (1 - 0.48 * ds)) {
+        // Joshua tree — obstacle cells, clustered, large scale, rare
+        if (isObstacleCell && clusterNoise > 0.52 && slope < 0.36 && hash2(gx * 5.61, gy * 4.23) > Math.max(0, 1 - 0.038 * ds * joshuaTreeDensity)) {
+          const scale = 1.5 + hash2(gx * 0.53, gy * 0.47) * 1.1;
+          joshuaArr.push({ x: px, z: pz, scale });
+        }
+
+        if (isRoughCell && patchMask > 0.2 && densityNoise > Math.max(0, 1 - 0.55 * ds * bushDensity) && hash2(gx * 1.91, gy * 0.83) > Math.max(0, 1 - 0.48 * ds * bushDensity)) {
           const scale = 0.65 + densityNoise * 1.15;
           bushArr.push({ x: px, z: pz, scale });
         }
 
-        // Grass strands — tall golden blades in dense randomised spread patches
+        // Grass strands
         if (isSafeCell && slope < 0.38 && height > -0.5 && height < 2.8) {
-          // Two-octave patch mask: large blobs × medium variation
-          const fieldNoise  = noise2D(px * 0.014, pz * 0.014) * 0.5 + 0.5; // large patch scale
-          const detailNoise = noise2D(px * 0.035, pz * 0.035) * 0.5 + 0.5; // break-up detail
+          const fieldNoise  = noise2D(px * 0.014, pz * 0.014) * 0.5 + 0.5;
+          const detailNoise = noise2D(px * 0.035, pz * 0.035) * 0.5 + 0.5;
           const fieldMask = THREE.MathUtils.smoothstep(fieldNoise, 0.36, 0.68)
                           * THREE.MathUtils.smoothstep(detailNoise, 0.28, 0.62);
           const isInPatch = patchMask > 0.22 && fieldMask > 0.05;
           const grassChance = isInPatch
-            ? (0.60 + clusterNoise * 0.35) * ds
-            : (0.03 + clusterNoise * 0.06) * ds;
-          if (hash2(gx * 3.91, gy * 2.17) > (1 - grassChance)) {
+            ? (0.60 + clusterNoise * 0.35) * ds * grassDensity
+            : (0.03 + clusterNoise * 0.06) * ds * grassDensity;
+          if (hash2(gx * 3.91, gy * 2.17) > Math.max(0, 1 - grassChance)) {
             const scale = 0.85 + hash2(gx * 0.52, gy * 0.29) * 0.7;
             grassArr.push({ x: px, z: pz, scale });
-            // Wide-radius burst: scatter 5–10 extra clumps up to 3.5 world-units away
-            // so each spawned point seeds a visible field patch
             if (isInPatch && fieldMask > 0.2) {
               const burst = 5 + Math.floor(hash2(gx * 13.7, gy * 9.3) * 6);
               for (let b = 0; b < burst; b++) {
                 const sa = hash2(gx * (b + 2.1), gy * (b + 1.3)) * Math.PI * 2;
-                // Vary radius: inner ring 0.4–1.4, outer ring 1.5–3.5
                 const ring = hash2(gy * (b + 0.7), gx * (b + 3.1)) > 0.5 ? 1 : 0;
                 const sr = ring === 0
                   ? 0.4 + hash2(gy * (b + 4.7), gx * (b + 2.9)) * 1.0
@@ -942,10 +1158,10 @@ export default function Obstacles({
           }
         }
 
-        // Pebble clusters — lower slope, everywhere but peaks
+        // Pebble clusters
         if (!isObstacleCell && slope < 0.55 && height < 2.8) {
-          const pebbleChance = (0.28 + densityNoise * 0.2) * ds;
-          if (hash2(gx * 7.07, gy * 5.33) > (1 - pebbleChance)) {
+          const pebbleChance = (0.28 + densityNoise * 0.2) * ds * pebbleDensity;
+          if (hash2(gx * 7.07, gy * 5.33) > Math.max(0, 1 - pebbleChance)) {
             const scale = 0.35 + hash2(gx * 0.18, gy * 0.41) * 0.6;
             pebbleArr.push({ x: px, z: pz, scale });
           }
@@ -1089,6 +1305,21 @@ export default function Obstacles({
       pCols.push(new THREE.Color().setHSL(0.08 + cn * 0.04, 0.18 + cn * 0.12, 0.45 + cn * 0.12));
     }
 
+    const jMats: THREE.Matrix4[] = [];
+    const jCols: THREE.Color[] = [];
+    for (const { x, z, scale } of joshuaArr) {
+      if (!isFiniteNumber(x) || !isFiniteNumber(z) || !isFiniteNumber(scale)) continue;
+      const ty = getTerrainHeight(noise2D, x, z, worldSize, terrainRelief, terrainHeightOffset);
+      if (!isFiniteNumber(ty)) continue;
+      dummy.position.set(x, ty, z);
+      dummy.rotation.set(0, noise2D(x * 0.07, z * 0.07) * Math.PI * 2, 0);
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      jMats.push(dummy.matrix.clone());
+      const cn = hash2(x * 0.11, z * 0.11);
+      jCols.push(new THREE.Color().setHSL(0.24 + cn * 0.04, 0.38 + cn * 0.14, 0.28 + cn * 0.1));
+    }
+
     return {
       rockMatrices: rMats, rockColors: rCols,
       cactusMatrices: cMats, cactusColors: cCols,
@@ -1097,8 +1328,10 @@ export default function Obstacles({
       treeMatrices: tMats, treeColors: tCols,
       grassMatrices: gMats, grassColors: gCols,
       pebbleMatrices: pMats, pebbleColors: pCols,
+      joshuaMatrices: jMats, joshuaColors: jCols,
     };
-  }, [costmapData, costmapWidth, costmapHeight, worldSize, terrainRelief, terrainHeightOffset, densityScale]);
+  }, [costmapData, costmapWidth, costmapHeight, worldSize, terrainRelief, terrainHeightOffset, densityScale,
+      rockDensity, cactusDensity, barrelCactusDensity, bushDensity, ocotilloDensity, grassDensity, pebbleDensity, joshuaTreeDensity]);
 
   const rockCount = rockMatrices.length;
   const cactusCount = cactusMatrices.length;
@@ -1107,6 +1340,7 @@ export default function Obstacles({
   const treeCount = treeMatrices.length;
   const grassCount = grassMatrices.length;
   const pebbleCount = pebbleMatrices.length;
+  const joshuaCount = joshuaMatrices.length;
 
   useEffect(() => {
     const mesh = rocksRef.current;
@@ -1164,7 +1398,15 @@ export default function Obstacles({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [pebbleCount, pebbleMatrices, pebbleColors]);
 
-  const totalCount = rockCount + cactusCount + barrelCount + bushCount + treeCount + grassCount + pebbleCount;
+  useEffect(() => {
+    const mesh = joshuaRef.current;
+    if (!mesh || joshuaCount === 0) return;
+    for (let i = 0; i < joshuaCount; i++) { mesh.setMatrixAt(i, joshuaMatrices[i]); mesh.setColorAt(i, joshuaColors[i]); }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [joshuaCount, joshuaMatrices, joshuaColors]);
+
+  const totalCount = rockCount + cactusCount + barrelCount + bushCount + treeCount + grassCount + pebbleCount + joshuaCount;
   if (totalCount === 0) return null;
 
   return (
@@ -1176,6 +1418,7 @@ export default function Obstacles({
       {treeCount > 0 && <instancedMesh ref={treeRef} args={[treeGeo, treeMat, treeCount]} castShadow receiveShadow frustumCulled={false} />}
       {grassCount > 0 && <instancedMesh ref={grassRef} args={[grassGeo, grassMat, grassCount]} castShadow receiveShadow frustumCulled={false} />}
       {pebbleCount > 0 && <instancedMesh ref={pebbleRef} args={[pebbleGeo, pebbleMat, pebbleCount]} castShadow receiveShadow frustumCulled={false} />}
+      {joshuaCount > 0 && <instancedMesh ref={joshuaRef} args={[joshuaGeo, joshuaMat, joshuaCount]} castShadow receiveShadow frustumCulled={false} />}
     </group>
   );
 }

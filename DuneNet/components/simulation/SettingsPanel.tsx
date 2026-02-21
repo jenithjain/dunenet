@@ -203,6 +203,17 @@ export default function SettingsPanel({
           <Slider label="Obstacle Density" value={s.obstacleDensity} min={0.005} max={0.12} step={0.005} onChange={(v) => set({ obstacleDensity: v })} />
           <Slider label="Rough Terrain" value={s.roughDensity} min={0.02} max={0.3} step={0.01} onChange={(v) => set({ roughDensity: v })} />
 
+          {/* ── Per-obstacle density ── */}
+          <SectionHeader title="Obstacles" />
+          <Slider label="Rocks" value={s.rockDensity} min={0} max={3} step={0.1} onChange={(v) => set({ rockDensity: v })} />
+          <Slider label="Saguaro Cactus" value={s.cactusDensity} min={0} max={3} step={0.1} onChange={(v) => set({ cactusDensity: v })} />
+          <Slider label="Barrel Cactus" value={s.barrelCactusDensity} min={0} max={3} step={0.1} onChange={(v) => set({ barrelCactusDensity: v })} />
+          <Slider label="Dry Bushes" value={s.bushDensity} min={0} max={3} step={0.1} onChange={(v) => set({ bushDensity: v })} />
+          <Slider label="Ocotillo" value={s.ocotilloDensity} min={0} max={3} step={0.1} onChange={(v) => set({ ocotilloDensity: v })} />
+          <Slider label="Joshua Trees" value={s.joshuaTreeDensity} min={0} max={3} step={0.1} onChange={(v) => set({ joshuaTreeDensity: v })} />
+          <Slider label="Grass Clumps" value={s.grassDensity} min={0} max={3} step={0.1} onChange={(v) => set({ grassDensity: v })} />
+          <Slider label="Pebbles" value={s.pebbleDensity} min={0} max={3} step={0.1} onChange={(v) => set({ pebbleDensity: v })} />
+
           <div style={{ height: 4 }} />
           <Slider label="Dust Count" value={s.dustCount} min={0} max={6000} step={100} onChange={(v) => set({ dustCount: v })} />
           <Slider label="Dust Opacity" value={s.dustOpacity} min={0} max={0.85} step={0.01} onChange={(v) => set({ dustOpacity: v })} />

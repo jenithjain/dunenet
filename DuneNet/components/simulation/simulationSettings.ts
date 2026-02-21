@@ -44,6 +44,16 @@ export interface SimSettings {
   terrainSegments: number;      // 64 – 512
   terrainRelief: number;        // 0.4 – 3.5
   terrainHeightOffset: number;  // -8 – 8
+
+  // ── Per-obstacle visual density (0 = none, 1 = default, 3 = dense) ──
+  rockDensity: number;
+  cactusDensity: number;
+  barrelCactusDensity: number;
+  bushDensity: number;
+  ocotilloDensity: number;
+  grassDensity: number;
+  pebbleDensity: number;
+  joshuaTreeDensity: number;
 }
 
 export const DEFAULT_SETTINGS: SimSettings = {
@@ -82,6 +92,15 @@ export const DEFAULT_SETTINGS: SimSettings = {
   terrainSegments: 256,
   terrainRelief: 1.0,
   terrainHeightOffset: 0,
+
+  rockDensity: 1,
+  cactusDensity: 1,
+  barrelCactusDensity: 1,
+  bushDensity: 1,
+  ocotilloDensity: 1,
+  grassDensity: 1,
+  pebbleDensity: 1,
+  joshuaTreeDensity: 1,
 };
 
 /**
