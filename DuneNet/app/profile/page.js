@@ -77,7 +77,7 @@ export default function ProfilePage() {
             <div>
               <h1 className="text-4xl font-bold text-foreground ivy-font">Profile</h1>
               <p className="text-muted-foreground ivy-font mt-1">
-                Manage your account information and business profile
+                Manage your account information and research profile
               </p>
             </div>
             <Button
@@ -159,10 +159,10 @@ export default function ProfilePage() {
               <div>
                 <CardTitle className="ivy-font flex items-center gap-2">
                   <Shield className="h-5 w-5" />
-                  KYC Verification Status
+                  Researcher Verification Status
                 </CardTitle>
                 <CardDescription className="ivy-font">
-                  Business profile verification and compliance
+                  Research profile verification and access level
                 </CardDescription>
               </div>
               {hasCompletedKYC ? (
@@ -189,19 +189,19 @@ export default function ProfilePage() {
                   variant="outline"
                   className="ivy-font"
                 >
-                  View Business Profile
+                  View Research Profile
                 </Button>
               </div>
             ) : (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground ivy-font">
-                  Complete your writer profile to unlock full access to DuneNet features including story analytics, character tracking, and AI-powered creative assistance.
+                  Complete your researcher profile to unlock full access to DuneNet features including model training, experiment tracking, and AI-powered segmentation analysis.
                 </p>
                 <Button
                   onClick={() => router.push("/dashboard")}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white ivy-font"
                 >
-                  Complete KYC Verification
+                  Complete Verification
                 </Button>
               </div>
             )}
@@ -214,10 +214,10 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="ivy-font flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                Business Profile
+                Research Profile
               </CardTitle>
               <CardDescription className="ivy-font">
-                Your verified business information
+                Your verified research information
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

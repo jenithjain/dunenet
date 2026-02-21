@@ -1,8 +1,8 @@
 {
-  "name": "scriptforge",
+  "name": "dunenet",
   "version": "0.1.0",
   "private": true,
-  "description": "ScriptForge - Smart Script Writing Assistant. AI-powered intelligent writing assistant for maintaining narrative continuity in screenplays and long-form stories",
+  "description": "DuneNet - Autonomous UGV Perception Platform. Train and evaluate semantic segmentation models on digital twin desert environments for robust off-road navigation",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

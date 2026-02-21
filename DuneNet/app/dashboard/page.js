@@ -18,67 +18,78 @@ import {
   PenTool, Target, Network, Shield
 } from "lucide-react";
 
-// Story Progress Data
+// Training Loss & mIoU Progress
 const progressData = [
-  { chapter: "Ch 1", wordCount: 4500, targetCount: 5000, completion: 90 },
-  { chapter: "Ch 2", wordCount: 5200, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 3", wordCount: 4800, targetCount: 5000, completion: 96 },
-  { chapter: "Ch 4", wordCount: 6100, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 5", wordCount: 5500, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 6", wordCount: 6700, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 7", wordCount: 7200, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 8", wordCount: 6900, targetCount: 5000, completion: 100 },
-  { chapter: "Ch 9", wordCount: 3200, targetCount: 5000, completion: 64 },
-  { chapter: "Ch 10", wordCount: 0, targetCount: 5000, completion: 0 },
-  { chapter: "Ch 11", wordCount: 0, targetCount: 5000, completion: 0 },
-  { chapter: "Ch 12", wordCount: 0, targetCount: 5000, completion: 0 },
+  { epoch: "Ep 1", trainLoss: 2.31, valLoss: 2.45, mIoU: 12 },
+  { epoch: "Ep 5", trainLoss: 1.82, valLoss: 1.95, mIoU: 28 },
+  { epoch: "Ep 10", trainLoss: 1.34, valLoss: 1.52, mIoU: 41 },
+  { epoch: "Ep 15", trainLoss: 0.98, valLoss: 1.18, mIoU: 54 },
+  { epoch: "Ep 20", trainLoss: 0.72, valLoss: 0.94, mIoU: 63 },
+  { epoch: "Ep 25", trainLoss: 0.58, valLoss: 0.81, mIoU: 69 },
+  { epoch: "Ep 30", trainLoss: 0.45, valLoss: 0.72, mIoU: 74 },
+  { epoch: "Ep 35", trainLoss: 0.38, valLoss: 0.66, mIoU: 77 },
+  { epoch: "Ep 40", trainLoss: 0.32, valLoss: 0.61, mIoU: 80 },
+  { epoch: "Ep 45", trainLoss: 0.28, valLoss: 0.58, mIoU: 82 },
+  { epoch: "Ep 50", trainLoss: 0.25, valLoss: 0.56, mIoU: 84 },
+  { epoch: "Ep 55", trainLoss: 0.23, valLoss: 0.55, mIoU: 85 },
 ];
 
-const characterActivityData = [
-  { name: "Sarah", appearances: 28, dialogueLines: 284, arcProgress: 85 },
-  { name: "Marcus", appearances: 22, dialogueLines: 223, arcProgress: 72 },
-  { name: "Elena", appearances: 18, dialogueLines: 182, arcProgress: 68 },
-  { name: "Detective Ray", appearances: 15, dialogueLines: 151, arcProgress: 55 },
+// Per-class IoU Distribution
+const classIoUData = [
+  { name: "Sky", iou: 94 },
+  { name: "Landscape", iou: 87 },
+  { name: "Rocks", iou: 78 },
+  { name: "Trees", iou: 82 },
+  { name: "Lush Bushes", iou: 71 },
+  { name: "Dry Grass", iou: 65 },
+  { name: "Dry Bushes", iou: 62 },
+  { name: "Ground Clutter", iou: 58 },
+  { name: "Flowers", iou: 52 },
+  { name: "Logs", iou: 48 },
 ];
 
-const storyElementsData = [
-  { id: 1, type: "Plot Thread", element: "The Mystery of the Missing Journal", status: "Active", chapters: "1-9" },
-  { id: 2, type: "Plot Thread", element: "Sarah's Transformation Arc", status: "Active", chapters: "1-9" },
-  { id: 3, type: "Subplot", element: "Marcus and Elena's Romance", status: "Active", chapters: "3-9" },
-  { id: 4, type: "Plot Thread", element: "The Corporate Conspiracy", status: "Resolved", chapters: "1-7" },
-  { id: 5, type: "Subplot", element: "Detective Ray's Investigation", status: "Active", chapters: "2-9" },
-  { id: 6, type: "Mystery", element: "Who sent the anonymous letter?", status: "Active", chapters: "5-9" },
-  { id: 7, type: "Character", element: "Sarah's mentor relationship", status: "Active", chapters: "2-9" },
-  { id: 8, type: "Location", element: "The Old Library recurring setting", status: "Active", chapters: "1-9" },
+// Experiment Tracker
+const experimentData = [
+  { id: 1, type: "Backbone", element: "DenseNet-121 Encoder + U-Net Decoder", status: "Active", detail: "mIoU 85.2%" },
+  { id: 2, type: "Augmentation", element: "Random Flip + Color Jitter + Gaussian Blur", status: "Active", detail: "+3.1% mIoU" },
+  { id: 3, type: "Loss Function", element: "Focal Loss + Dice Loss Combination", status: "Active", detail: "α=0.25 γ=2" },
+  { id: 4, type: "Backbone", element: "ResNet-50 Encoder Baseline", status: "Completed", detail: "mIoU 78.4%" },
+  { id: 5, type: "Training", element: "CosineAnnealing LR Schedule", status: "Active", detail: "lr 1e-3→1e-5" },
+  { id: 6, type: "Domain Adapt", element: "Style Transfer Augmentation", status: "Active", detail: "+2.5% gen." },
+  { id: 7, type: "Architecture", element: "Multi-Scale Feature Fusion (FPN)", status: "Active", detail: "3 scales" },
+  { id: 8, type: "Evaluation", element: "Test Set Inference (Unseen Desert)", status: "Pending", detail: "Awaiting" },
 ];
 
-const timelineData = [
-  { chapter: "Ch 1", events: 12, characters: 4 },
-  { chapter: "Ch 2", events: 13, characters: 5 },
-  { chapter: "Ch 3", events: 14, characters: 5 },
-  { chapter: "Ch 4", events: 14, characters: 6 },
-  { chapter: "Ch 5", events: 15, characters: 6 },
-  { chapter: "Ch 6", events: 14, characters: 7 },
-  { chapter: "Ch 7", events: 16, characters: 7 },
-  { chapter: "Ch 8", events: 17, characters: 8 },
-  { chapter: "Ch 9", events: 16, characters: 8 },
-  { chapter: "Ch 10", events: 0, characters: 0 },
+// Per-epoch Events/Metrics
+const epochMetricsData = [
+  { epoch: "Ep 5", pixelAcc: 68, mIoU: 28 },
+  { epoch: "Ep 10", pixelAcc: 76, mIoU: 41 },
+  { epoch: "Ep 15", pixelAcc: 82, mIoU: 54 },
+  { epoch: "Ep 20", pixelAcc: 86, mIoU: 63 },
+  { epoch: "Ep 25", pixelAcc: 89, mIoU: 69 },
+  { epoch: "Ep 30", pixelAcc: 91, mIoU: 74 },
+  { epoch: "Ep 35", pixelAcc: 92, mIoU: 77 },
+  { epoch: "Ep 40", pixelAcc: 93, mIoU: 80 },
+  { epoch: "Ep 45", pixelAcc: 94, mIoU: 82 },
+  { epoch: "Ep 50", pixelAcc: 95, mIoU: 84 },
 ];
 
-const storyHealthData = [
-  { metric: "Character Consistency", value: 95, fullMark: 100 },
-  { metric: "Timeline Coherence", value: 88, fullMark: 100 },
-  { metric: "Plot Thread Management", value: 92, fullMark: 100 },
-  { metric: "Dialogue Quality", value: 85, fullMark: 100 },
-  { metric: "Pacing", value: 78, fullMark: 100 },
-  { metric: "Continuity Score", value: 91, fullMark: 100 },
+// Model Quality Radar
+const modelHealthData = [
+  { metric: "Pixel Accuracy", value: 95, fullMark: 100 },
+  { metric: "Mean IoU", value: 85, fullMark: 100 },
+  { metric: "Boundary Precision", value: 78, fullMark: 100 },
+  { metric: "Generalization", value: 72, fullMark: 100 },
+  { metric: "Inference Speed", value: 88, fullMark: 100 },
+  { metric: "Robustness", value: 80, fullMark: 100 },
 ];
 
-const chapterStatsData = [
-  { chapter: "Q1", wordsWritten: 18000, targetWords: 20000, revisions: 6 },
-  { chapter: "Q2", wordsWritten: 21000, targetWords: 20000, revisions: 7 },
-  { chapter: "Q3", wordsWritten: 24500, targetWords: 20000, revisions: 9 },
-  { chapter: "Q4", wordsWritten: 28000, targetWords: 20000, revisions: 11 },
+// Training Runs Comparison
+const trainingRunsData = [
+  { run: "Run 1", trainMIoU: 78, valMIoU: 72, epochs: 30 },
+  { run: "Run 2", trainMIoU: 82, valMIoU: 76, epochs: 40 },
+  { run: "Run 3", trainMIoU: 85, valMIoU: 80, epochs: 50 },
+  { run: "Run 4", trainMIoU: 87, valMIoU: 82, epochs: 55 },
 ];
 
 const CHART_COLORS = {
@@ -169,19 +180,19 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-4xl font-bold text-foreground ivy-font mb-2">
-              Story Writing Dashboard
+              Segmentation Dashboard
             </h1>
             <p className="text-muted-foreground ivy-font">
-              Track your narrative progress, character arcs, and story continuity
+              Monitor training progress, per-class IoU, and model generalization metrics
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="px-3 py-1 ivy-font">
-              Chapter 9 - In Progress
+              Epoch 55 - Training
             </Badge>
             <Button className="bg-emerald-500 hover:bg-emerald-600 text-white ivy-font">
               <PenTool className="h-4 w-4 mr-2" />
-              Continue Writing
+              Run Inference
             </Button>
           </div>
         </div>
@@ -189,30 +200,30 @@ export default function Dashboard() {
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Total Word Count"
-            value="49,900"
-            change="+15.2%"
-            icon={BookOpen}
+            title="Mean IoU"
+            value="85.2%"
+            change="+4.8%"
+            icon={Target}
             trend="up"
           />
           <StatCard
-            title="Characters Tracked"
-            value="12"
-            change="+3"
+            title="Semantic Classes"
+            value="10"
+            change="All tracked"
             icon={Users}
             trend="up"
           />
           <StatCard
-            title="Active Plot Threads"
-            value="5"
-            change="+1"
+            title="Pixel Accuracy"
+            value="95.1%"
+            change="+1.2%"
             icon={GitBranch}
             trend="up"
           />
           <StatCard
-            title="Continuity Score"
-            value="91%"
-            change="+2.4%"
+            title="Generalization Gap"
+            value="5.3%"
+            change="-1.8%"
             icon={Shield}
             trend="up"
           />
@@ -221,12 +232,12 @@ export default function Dashboard() {
         {/* Main Charts */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="bg-muted/50 backdrop-blur-sm">
-            <TabsTrigger value="overview" className="ivy-font">Writing Progress</TabsTrigger>
-            <TabsTrigger value="analytics" className="ivy-font">Character Activity</TabsTrigger>
-            <TabsTrigger value="performance" className="ivy-font">Story Health</TabsTrigger>
-            <TabsTrigger value="cashflow" className="ivy-font">Timeline Events</TabsTrigger>
-            <TabsTrigger value="investments" className="ivy-font">Chapter Stats</TabsTrigger>
-            <TabsTrigger value="transactions" className="ivy-font">Story Elements</TabsTrigger>
+            <TabsTrigger value="overview" className="ivy-font">Training Progress</TabsTrigger>
+            <TabsTrigger value="analytics" className="ivy-font">Per-Class IoU</TabsTrigger>
+            <TabsTrigger value="performance" className="ivy-font">Model Quality</TabsTrigger>
+            <TabsTrigger value="cashflow" className="ivy-font">Epoch Metrics</TabsTrigger>
+            <TabsTrigger value="investments" className="ivy-font">Run Comparison</TabsTrigger>
+            <TabsTrigger value="transactions" className="ivy-font">Experiments</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -234,9 +245,9 @@ export default function Dashboard() {
             <div className="grid gap-4 md:grid-cols-7">
               <Card className="col-span-4 border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader>
-                  <CardTitle className="ivy-font">Chapter Progress</CardTitle>
+                  <CardTitle className="ivy-font">Training & Validation Loss</CardTitle>
                   <CardDescription className="ivy-font">
-                    Word count progress across chapters with target completion
+                    Loss convergence across training epochs
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pl-2">
@@ -247,14 +258,14 @@ export default function Dashboard() {
                           <stop offset="5%" stopColor={chartColors.revenue} stopOpacity={0.3}/>
                           <stop offset="95%" stopColor={chartColors.revenue} stopOpacity={0}/>
                         </linearGradient>
-                        <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={chartColors.profit} stopOpacity={0.3}/>
                           <stop offset="95%" stopColor={chartColors.profit} stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                       <XAxis 
-                        dataKey="chapter" 
+                        dataKey="epoch" 
                         stroke={isDarkMode ? "#94a3b8" : "#64748b"}
                         style={{ fontSize: '12px' }}
                       />
@@ -273,22 +284,22 @@ export default function Dashboard() {
                       <Legend />
                       <Area 
                         type="monotone" 
-                        dataKey="wordCount" 
+                        dataKey="trainLoss" 
                         stroke={chartColors.revenue} 
                         fillOpacity={1} 
                         fill="url(#colorActual)"
                         strokeWidth={2}
-                        name="Word Count"
+                        name="Train Loss"
                       />
                       <Area 
                         type="monotone" 
-                        dataKey="targetCount" 
+                        dataKey="valLoss" 
                         stroke={chartColors.profit} 
                         fillOpacity={1} 
-                        fill="url(#colorForecast)"
+                        fill="url(#colorVal)"
                         strokeWidth={2}
                         strokeDasharray="5 5"
-                        name="Target Count"
+                        name="Val Loss"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -297,25 +308,25 @@ export default function Dashboard() {
 
               <Card className="col-span-3 border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader>
-                  <CardTitle className="ivy-font">Character Activity</CardTitle>
+                  <CardTitle className="ivy-font">Per-Class IoU</CardTitle>
                   <CardDescription className="ivy-font">
-                    Distribution by character prominence
+                    IoU distribution across semantic classes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={350}>
                     <PieChart>
                       <Pie
-                        data={characterActivityData}
+                        data={classIoUData.slice(0, 4)}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         outerRadius={100}
                         fill="#8884d8"
-                        dataKey="appearances"
+                        dataKey="iou"
                       >
-                        {characterActivityData.map((entry, index) => (
+                        {classIoUData.slice(0, 4).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                         ))}
                       </Pie>
@@ -329,16 +340,16 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="mt-4 space-y-2">
-                    {characterActivityData.map((character, idx) => (
-                      <div key={character.name} className="flex items-center justify-between">
+                    {classIoUData.slice(0, 4).map((cls, idx) => (
+                      <div key={cls.name} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div 
                             className="w-3 h-3 rounded-full" 
                             style={{ backgroundColor: PIE_COLORS[idx] }}
                           />
-                          <span className="text-sm text-muted-foreground ivy-font">{character.name}</span>
+                          <span className="text-sm text-muted-foreground ivy-font">{cls.name}</span>
                         </div>
-                        <span className="text-sm font-medium ivy-font">{character.appearances} appearances</span>
+                        <span className="text-sm font-medium ivy-font">{cls.iou}% IoU</span>
                       </div>
                     ))}
                   </div>
@@ -352,9 +363,9 @@ export default function Dashboard() {
             <div className="grid gap-4 md:grid-cols-2">
               <Card className="border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader>
-                  <CardTitle className="ivy-font">Chapter Trends</CardTitle>
+                  <CardTitle className="ivy-font">mIoU Over Epochs</CardTitle>
                   <CardDescription className="ivy-font">
-                    Progress across the manuscript
+                    Mean IoU progression during training
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -362,7 +373,7 @@ export default function Dashboard() {
                     <LineChart data={progressData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                       <XAxis 
-                        dataKey="chapter" 
+                        dataKey="epoch" 
                         stroke={isDarkMode ? "#94a3b8" : "#64748b"}
                         style={{ fontSize: '12px' }}
                       />
@@ -380,11 +391,12 @@ export default function Dashboard() {
                       <Legend />
                       <Line 
                         type="monotone" 
-                        dataKey="wordCount" 
+                        dataKey="mIoU" 
                         stroke={chartColors.profit} 
                         strokeWidth={3}
                         dot={{ fill: chartColors.profit, r: 5 }}
                         activeDot={{ r: 7 }}
+                        name="Mean IoU (%)"
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -393,19 +405,22 @@ export default function Dashboard() {
 
               <Card className="border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader>
-                  <CardTitle className="ivy-font">Timeline Events</CardTitle>
+                  <CardTitle className="ivy-font">Per-Class IoU Breakdown</CardTitle>
                   <CardDescription className="ivy-font">
-                    Events and characters per chapter
+                    IoU scores for all 10 semantic classes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={timelineData}>
+                    <BarChart data={classIoUData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                       <XAxis 
-                        dataKey="month" 
+                        dataKey="name" 
                         stroke={isDarkMode ? "#94a3b8" : "#64748b"}
-                        style={{ fontSize: '12px' }}
+                        style={{ fontSize: '10px' }}
+                        angle={-30}
+                        textAnchor="end"
+                        height={60}
                       />
                       <YAxis 
                         stroke={isDarkMode ? "#94a3b8" : "#64748b"}
@@ -419,8 +434,7 @@ export default function Dashboard() {
                         }}
                       />
                       <Legend />
-                      <Bar dataKey="events" fill={chartColors.revenue} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="characters" fill={chartColors.profit} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="iou" fill={chartColors.revenue} radius={[4, 4, 0, 0]} name="IoU (%)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -432,14 +446,14 @@ export default function Dashboard() {
           <TabsContent value="performance" className="space-y-4">
             <Card className="border-border/40 backdrop-blur-sm bg-card/50 hover:shadow-lg transition-all duration-300">
               <CardHeader>
-                <CardTitle className="ivy-font">Story Health Metrics</CardTitle>
+                <CardTitle className="ivy-font">Model Quality Radar</CardTitle>
                 <CardDescription className="ivy-font">
-                  Comprehensive view of story quality across key areas
+                  Comprehensive view of segmentation model performance across key dimensions
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
-                  <RadarChart data={storyHealthData}>
+                  <RadarChart data={modelHealthData}>
                     <PolarGrid stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                     <PolarAngleAxis 
                       dataKey="metric" 
@@ -470,7 +484,7 @@ export default function Dashboard() {
                   </RadarChart>
                 </ResponsiveContainer>
                 <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {storyHealthData.map((item, idx) => (
+                  {modelHealthData.map((item, idx) => (
                     <div key={idx} className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all hover:scale-105 cursor-pointer">
                       <p className="text-sm text-muted-foreground ivy-font mb-1">{item.metric}</p>
                       <div className="flex items-center gap-2">
@@ -484,21 +498,21 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
 
-          {/* Cash Flow Tab */}
+          {/* Epoch Metrics Tab */}
           <TabsContent value="cashflow" className="space-y-4">
             <Card className="border-border/40 backdrop-blur-sm bg-card/50 hover:shadow-lg transition-all duration-300">
               <CardHeader>
-                <CardTitle className="ivy-font">Writing Activity by Quarter</CardTitle>
+                <CardTitle className="ivy-font">Pixel Accuracy vs mIoU by Epoch</CardTitle>
                 <CardDescription className="ivy-font">
-                  Track words written, targets, and revision rounds
+                  Track both metrics across training epochs
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
-                  <ComposedChart data={chapterStatsData}>
+                  <ComposedChart data={epochMetricsData}>
                     <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                     <XAxis 
-                      dataKey="chapter" 
+                      dataKey="epoch" 
                       stroke={isDarkMode ? "#94a3b8" : "#64748b"}
                       style={{ fontSize: '12px' }}
                     />
@@ -514,78 +528,77 @@ export default function Dashboard() {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="wordsWritten" fill={chartColors.revenue} radius={[8, 8, 0, 0]} name="Words Written" />
-                    <Bar dataKey="targetWords" fill={chartColors.expenses} radius={[8, 8, 0, 0]} name="Target Words" />
+                    <Bar dataKey="pixelAcc" fill={chartColors.revenue} radius={[8, 8, 0, 0]} name="Pixel Accuracy (%)" />
                     <Line 
                       type="monotone" 
-                      dataKey="revisions" 
+                      dataKey="mIoU" 
                       stroke={chartColors.profit} 
                       strokeWidth={3}
-                      name="Revisions"
+                      name="mIoU (%)"
                       dot={{ fill: chartColors.profit, r: 6 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
                 <div className="mt-6 grid grid-cols-3 gap-4">
                   <div className="p-4 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 transition-all hover:scale-105 cursor-pointer">
-                    <p className="text-sm text-emerald-600 dark:text-emerald-400 ivy-font mb-1">Total Inflow</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 ivy-font">$915K</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-red-500/10 hover:bg-red-500/20 transition-all hover:scale-105 cursor-pointer">
-                    <p className="text-sm text-red-600 dark:text-red-400 ivy-font mb-1">Total Outflow</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400 ivy-font">$580K</p>
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400 ivy-font mb-1">Best mIoU</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 ivy-font">85.2%</p>
                   </div>
                   <div className="p-4 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-all hover:scale-105 cursor-pointer">
-                    <p className="text-sm text-blue-600 dark:text-blue-400 ivy-font mb-1">Net Position</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 ivy-font">$335K</p>
+                    <p className="text-sm text-blue-600 dark:text-blue-400 ivy-font mb-1">Pixel Accuracy</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 ivy-font">95.1%</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 transition-all hover:scale-105 cursor-pointer">
+                    <p className="text-sm text-purple-600 dark:text-purple-400 ivy-font mb-1">Train Epochs</p>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 ivy-font">55</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Investments Tab */}
+          {/* Run Comparison Tab */}
           <TabsContent value="investments" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium ivy-font">
-                    Portfolio Value
+                    Best Val mIoU
                   </CardTitle>
                   
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold ivy-font">$182,000</div>
+                  <div className="text-2xl font-bold ivy-font">82.0%</div>
                   <p className="text-xs text-muted-foreground ivy-font">
-                    +8.2% from last month
+                    Run 4, Epoch 55
                   </p>
                 </CardContent>
               </Card>
               <Card className="border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium ivy-font">
-                    Target Value
+                    Target mIoU
                   </CardTitle>
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold ivy-font">$175,000</div>
+                  <div className="text-2xl font-bold ivy-font">80.0%</div>
                   <p className="text-xs text-emerald-500 ivy-font">
-                    Target achieved! 🎉
+                    Target achieved!
                   </p>
                 </CardContent>
               </Card>
               <Card className="border-border/40 backdrop-blur-sm bg-card/50">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium ivy-font">
-                    ROI
+                    Improvement
                   </CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold ivy-font">+45.6%</div>
+                  <div className="text-2xl font-bold ivy-font">+10.0%</div>
                   <p className="text-xs text-muted-foreground ivy-font">
-                    Year to date
+                    Val mIoU across 4 runs
                   </p>
                 </CardContent>
               </Card>
@@ -593,23 +606,23 @@ export default function Dashboard() {
 
             <Card className="border-border/40 backdrop-blur-sm bg-card/50">
               <CardHeader>
-                <CardTitle className="ivy-font">Chapter Completion Over Time</CardTitle>
+                <CardTitle className="ivy-font">Training Runs Comparison</CardTitle>
                 <CardDescription className="ivy-font">
-                  Your word count vs target over time
+                  Train vs Validation mIoU across experiment runs
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={progressData}>
+                  <AreaChart data={trainingRunsData}>
                     <defs>
-                      <linearGradient id="colorPortfolio" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorRunTrain" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={chartColors.portfolio} stopOpacity={0.3}/>
                         <stop offset="95%" stopColor={chartColors.portfolio} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
                     <XAxis 
-                      dataKey="chapter" 
+                      dataKey="run" 
                       stroke={isDarkMode ? "#94a3b8" : "#64748b"}
                       style={{ fontSize: '12px' }}
                     />
@@ -627,18 +640,20 @@ export default function Dashboard() {
                     <Legend />
                     <Area 
                       type="monotone" 
-                      dataKey="wordCount" 
+                      dataKey="trainMIoU" 
                       stroke={chartColors.portfolio} 
                       fillOpacity={1} 
-                      fill="url(#colorPortfolio)"
+                      fill="url(#colorRunTrain)"
                       strokeWidth={3}
+                      name="Train mIoU (%)"
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="targetCount" 
+                      dataKey="valMIoU" 
                       stroke={chartColors.target} 
                       strokeWidth={2}
                       strokeDasharray="5 5"
+                      name="Val mIoU (%)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -646,51 +661,53 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
 
-          {/* Suggested Offers Tab */}
+          {/* Experiments Tab */}
           <TabsContent value="transactions" className="space-y-4">
             <Card className="border-border/40 backdrop-blur-sm bg-card/50">
               <CardHeader>
-                <CardTitle className="ivy-font">Story Elements Tracker</CardTitle>
+                <CardTitle className="ivy-font">Experiment Tracker</CardTitle>
                 <CardDescription className="ivy-font">
-                  Active plot threads, characters, and story elements across chapters
+                  Active experiments, augmentations, and architecture changes across training runs
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {storyElementsData.map((element) => (
+                  {experimentData.map((experiment) => (
                     <div
-                      key={element.id}
+                      key={experiment.id}
                       className="flex items-center justify-between p-4 rounded-lg border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-4">
                         <div className={`p-2 rounded-full ${
-                          element.status === "Active" 
+                          experiment.status === "Active" 
                             ? "bg-emerald-500/10 text-emerald-500" 
-                            : element.status === "Resolved"
+                            : experiment.status === "Completed"
                             ? "bg-blue-500/10 text-blue-500"
-                            : "bg-slate-500/10 text-slate-500"
+                            : "bg-amber-500/10 text-amber-500"
                         }`}>
-                          {element.status === "Active" ? (
+                          {experiment.status === "Active" ? (
                             <Activity className="h-4 w-4" />
-                          ) : (
+                          ) : experiment.status === "Completed" ? (
                             <Shield className="h-4 w-4" />
+                          ) : (
+                            <Target className="h-4 w-4" />
                           )}
                         </div>
                         <div>
                           <p className="font-medium text-foreground ivy-font">
-                            {element.element}
+                            {experiment.element}
                           </p>
                           <p className="text-sm text-muted-foreground ivy-font">
-                            {element.type} • Chapters {element.chapters}
+                            {experiment.type} • {experiment.detail}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-emerald-500 ivy-font">
-                          {element.status}
+                          {experiment.status}
                         </div>
                         <Badge variant="outline" className="mt-1">
-                          {element.type}
+                          {experiment.type}
                         </Badge>
                       </div>
                     </div>
@@ -710,8 +727,8 @@ export default function Dashboard() {
                   <Brain className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg ivy-font">Check Continuity</CardTitle>
-                  <CardDescription className="ivy-font">Run consistency check</CardDescription>
+                  <CardTitle className="text-lg ivy-font">Run Evaluation</CardTitle>
+                  <CardDescription className="ivy-font">Compute IoU metrics</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -724,8 +741,8 @@ export default function Dashboard() {
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg ivy-font">Get Suggestions</CardTitle>
-                  <CardDescription className="ivy-font">AI creative ideas</CardDescription>
+                  <CardTitle className="text-lg ivy-font">Visualize Predictions</CardTitle>
+                  <CardDescription className="ivy-font">Overlay segmentation masks</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -738,8 +755,8 @@ export default function Dashboard() {
                   <PenTool className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg ivy-font">Start Writing</CardTitle>
-                  <CardDescription className="ivy-font">Continue your story</CardDescription>
+                  <CardTitle className="text-lg ivy-font">Start Training</CardTitle>
+                  <CardDescription className="ivy-font">Launch new training run</CardDescription>
                 </div>
               </div>
             </CardHeader>

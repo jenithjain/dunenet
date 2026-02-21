@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "DuneNet - Smart Script Writing Assistant",
-  description: "AI-powered intelligent writing assistant for maintaining narrative continuity, tracking characters, timelines, and plot threads in screenplays and long-form stories",
+  title: "DuneNet - Autonomous UGV Perception Platform",
+  description: "Train and evaluate semantic segmentation models on digital twin desert environments for robust off-road autonomous ground vehicle navigation",
 };
 
 export default function RootLayout({ children }) {

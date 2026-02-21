@@ -195,7 +195,7 @@ export default function LoginPage() {
         <div className="hidden md:block space-y-6">
           <div className="space-y-4">
             <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20">
-              Smart Script Writing Assistant
+              Autonomous UGV Perception System
             </Badge>
             <h1 className="text-5xl font-bold text-foreground ivy-font">
               Welcome to
@@ -204,16 +204,16 @@ export default function LoginPage() {
               </span>
             </h1>
             <p className="text-lg text-muted-foreground ivy-font max-w-md">
-              Your intelligent writing companion for maintaining perfect narrative continuity across screenplays and long-form stories.
+              Your intelligent perception companion for training robust semantic segmentation models on synthetic desert environments and deploying them to real autonomous UGVs.
             </p>
           </div>
 
           {/* Feature Cards */}
           <div className="space-y-3 mt-8">
             {[
-              { icon: TrendingUp, title: "Story Intelligence", desc: "Track characters, timelines, and plot threads" },
-              { icon: Shield, title: "Continuity Protection", desc: "Detect inconsistencies before they become problems" },
-              { icon: Sparkles, title: "AI Creative Support", desc: "Intelligent suggestions that match your style" }
+              { icon: TrendingUp, title: "Scene Intelligence", desc: "Classify every pixel into terrain, vegetation, obstacles, and sky" },
+              { icon: Shield, title: "Domain Generalization", desc: "Reliably navigate unseen desert environments beyond training data" },
+              { icon: Sparkles, title: "Digital Twin Training", desc: "Large-scale synthetic datasets with perfectly labeled segmentation masks" }
             ].map((feature, idx) => (
               <div 
                 key={idx}
@@ -244,8 +244,8 @@ export default function LoginPage() {
             </CardTitle>
             <CardDescription className="ivy-font">
               {isLogin 
-                ? "Sign in to access your writing projects and story analytics" 
-                : "Create an account to start writing with AI assistance"}
+                ? "Sign in to access your segmentation pipeline and experiment dashboard" 
+                : "Create an account to start training your UGV perception models"}
             </CardDescription>
           </CardHeader>
           <CardContent>

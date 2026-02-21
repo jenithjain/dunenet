@@ -13,18 +13,18 @@ import {
 } from "lucide-react";
 
 const SUGGESTED_PROMPTS = [
-  "Help me track character arcs across my screenplay",
-  "Check for timeline inconsistencies in chapters 1-5",
-  "Summarize Sarah's character development",
-  "Find all scenes where Marcus and Elena interact",
-  "Suggest plot ideas to resolve the mystery thread"
+  "Analyze per-class IoU breakdown for the latest training run",
+  "Compare DenseNet-121 vs ResNet-50 encoder performance",
+  "Show failure cases on visually similar desert classes",
+  "Suggest augmentation strategies to improve generalization",
+  "Evaluate domain gap between synthetic and unseen desert data"
 ];
 
 const DUMMY_MESSAGES = [
   {
     id: 1,
     role: "assistant",
-    content: "Hello! I'm DuneNet AI, your intelligent writing assistant. I can help you maintain narrative continuity, track characters and timelines, detect inconsistencies, and provide creative suggestions for your screenplay or story. What would you like me to help with?",
+    content: "Hello! I'm DuneNet AI, your intelligent segmentation assistant. I can help you analyze model performance, compare experiment runs, diagnose per-class IoU issues, suggest augmentation strategies, and optimize your semantic segmentation pipeline for desert UGV perception. What would you like me to help with?",
     timestamp: "07:21 PM"
   }
 ];
@@ -61,7 +61,7 @@ export default function Assistant() {
       const aiMessage = {
         id: messages.length + 2,
         role: "assistant",
-        content: "Analyzing your manuscript... ✓\n\nStory Context: Loaded 15 chapters\nCharacter Tracking: 12 main characters identified\nTimeline Validation: No inconsistencies found\nPlot Threads: 5 active, 2 resolved\n\nI've mapped Sarah's character arc from Chapter 1-15. Her transformation from skeptic to believer is well-paced. Suggested enhancement: Add a scene in Chapter 10 showing her internal conflict. Shall I provide detailed suggestions?",
+        content: "Analyzing your segmentation pipeline... ✓\n\nDataset: Synthetic Desert Digital Twin\nClasses Tracked: 10 semantic categories\nBest mIoU: 85.2% (DenseNet-121 + U-Net)\nPixel Accuracy: 95.1%\n\nPer-class analysis shows strong performance on Sky (94%) and Landscape (87%), but weaker on Logs (48%) and Flowers (52%). Recommended: Apply focal loss weighting on underrepresented classes and add multi-scale feature fusion to capture small objects. Shall I detail the optimization strategy?",
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMessage]);
@@ -104,11 +104,11 @@ export default function Assistant() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground ivy-font">DuneNet AI</h1>
-              <p className="text-sm text-emerald-500 ivy-font">Smart Script Writing Assistant</p>
+              <p className="text-sm text-emerald-500 ivy-font">Autonomous UGV Perception Assistant</p>
             </div>
           </div>
           <p className="text-muted-foreground ivy-font max-w-2xl mx-auto">
-            Intelligent writing assistant with comprehensive story awareness and narrative continuity tracking
+            Intelligent segmentation assistant with comprehensive model analysis and experiment tracking
           </p>
         </div>
 
@@ -206,7 +206,7 @@ export default function Assistant() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ask about your story, check character consistency, or get creative suggestions..."
+                    placeholder="Ask about model performance, analyze per-class IoU, or get optimization suggestions..."
                     className="resize-none min-h-[60px] max-h-[120px] pr-12 ivy-font bg-background/80 border-border/60 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
                     rows={1}
                   />
@@ -235,10 +235,10 @@ export default function Assistant() {
         {/* Quick Stats */}
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in" style={{ animationDelay: '0.3s' }}>
           {[
-            { icon: TrendingUp, label: "Sales Forecast", value: "Active" },
-            { icon: BarChart3, label: "RFM Segmentation", value: "Ready" },
-            { icon: Sparkles, label: "Campaign Agent", value: "Live" },
-            { icon: Target, label: "Workflows", value: "Updated" }
+            { icon: TrendingUp, label: "Training Monitor", value: "Active" },
+            { icon: BarChart3, label: "IoU Analysis", value: "Ready" },
+            { icon: Sparkles, label: "Segmentation Agent", value: "Live" },
+            { icon: Target, label: "Experiments", value: "Updated" }
           ].map((stat, idx) => (
             <Card
               key={idx}

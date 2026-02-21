@@ -78,7 +78,7 @@ export default function AuthPage() {
           </CardTitle>
           <CardDescription className="text-center text-gray-400">
             {isSignUp 
-              ? 'Sign up to start writing with AI assistance' 
+              ? 'Sign up to start training segmentation models' 
               : 'Sign in to continue to DuneNet'}
           </CardDescription>
         </CardHeader>

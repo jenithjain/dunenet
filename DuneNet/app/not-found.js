@@ -95,7 +95,7 @@ export default function NotFound() {
               </h2>
               <p className="text-lg text-muted-foreground ivy-font">
                 The page you're looking for doesn't exist in our DuneNet system. 
-                Let's get you back to your writing projects and story dashboard!
+                Let's get you back to your segmentation dashboard and experiments!
               </p>
             </div>
 
