@@ -515,6 +515,7 @@ export const LaserFlow = ({
       canvas.removeEventListener('webglcontextrestored', onCtxRestored);
       geometry.dispose();
       material.dispose();
+      renderer.forceContextLoss();
       renderer.dispose();
       if (mount.contains(canvas)) mount.removeChild(canvas);
     };

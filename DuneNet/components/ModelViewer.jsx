@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable react/no-unknown-property */
-import { Suspense, useRef, useLayoutEffect, useEffect, useMemo } from 'react';
+import { Suspense, useRef, useLayoutEffect, useEffect, useMemo, useState, useCallback } from 'react';
 import { Canvas, useFrame, useLoader, useThree, invalidate } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useFBX, useProgress, Html, Environment, ContactShadows } from '@react-three/drei';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
@@ -410,6 +410,33 @@ const ModelViewer = ({
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
+  const [contextLost, setContextLost] = useState(false);
+  const mountKeyRef = useRef(0);
+  const [mountKey, setMountKey] = useState(0);
+
+  // Handle WebGL context loss – show fallback and auto-recover
+  const handleContextLost = useCallback((e) => {
+    e.preventDefault();
+    console.warn('ModelViewer: WebGL context lost');
+    setContextLost(true);
+  }, []);
+
+  const handleContextRestored = useCallback(() => {
+    console.info('ModelViewer: WebGL context restored');
+    setContextLost(false);
+    invalidate();
+  }, []);
+
+  // Auto-recover from context loss by remounting Canvas after a delay
+  useEffect(() => {
+    if (!contextLost) return;
+    const timer = setTimeout(() => {
+      mountKeyRef.current += 1;
+      setMountKey(mountKeyRef.current);
+      setContextLost(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [contextLost]);
 
   const initYaw = deg2rad(defaultRotationX);
   const initPitch = deg2rad(defaultRotationY);
@@ -459,16 +486,30 @@ const ModelViewer = ({
         </button>
       )}
 
+      {contextLost && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl">
+          <div className="text-center">
+            <div className="w-8 h-8 mx-auto mb-3 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Restoring 3D view...</p>
+          </div>
+        </div>
+      )}
+
       <Canvas
+        key={mountKey}
         shadows
         frameloop="demand"
-        gl={{ preserveDrawingBuffer: true }}
+        gl={{ preserveDrawingBuffer: true, powerPreference: 'default' }}
         onCreated={({ gl, scene, camera }) => {
           rendererRef.current = gl;
           sceneRef.current = scene;
           cameraRef.current = camera;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.outputColorSpace = THREE.SRGBColorSpace;
+          // Listen for WebGL context loss/restore
+          const canvas = gl.domElement;
+          canvas.addEventListener('webglcontextlost', handleContextLost);
+          canvas.addEventListener('webglcontextrestored', handleContextRestored);
         }}
         camera={{ fov: 50, position: [0, 0, camZ], near: 0.01, far: 100 }}
         style={{ touchAction: 'pan-y pinch-zoom' }}

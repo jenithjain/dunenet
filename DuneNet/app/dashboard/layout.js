@@ -40,6 +40,7 @@ export default function DashboardLayout({ children }) {
             openMenuButtonColor="#22c55e"
             items={[
               { label: "Home", link: "/", ariaLabel: "Go to Home" },
+              { label: "Simulation", link: "/simulation", ariaLabel: "Desert Simulation" },
               { label: "Dashboard", link: "/dashboard", ariaLabel: "View Dashboard" },
               { label: "Experiments", link: "/dashboard", ariaLabel: "Segmentation Experiments" },
               { label: "Assistant", link: "/assistant", ariaLabel: "AI Assistant" },
