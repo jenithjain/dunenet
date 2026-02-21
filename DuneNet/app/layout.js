@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "ScriptForge - Smart Script Writing Assistant",
+  title: "DuneNet - Smart Script Writing Assistant",
   description: "AI-powered intelligent writing assistant for maintaining narrative continuity, tracking characters, timelines, and plot threads in screenplays and long-form stories",
 };
 

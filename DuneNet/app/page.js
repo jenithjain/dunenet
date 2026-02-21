@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 export default function Home() {
-  const modelUrl = "/models/data_chart_graphic_table_infographic.glb";
+  const modelUrl = "/models/mini_dron_ugv.glb";
   const [menuBtnColor, setMenuBtnColor] = useState('#000000');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [modelKey, setModelKey] = useState(Date.now());
@@ -87,25 +87,25 @@ export default function Home() {
             <div className="mb-4 sm:mb-6 flex items-center gap-3">
               <img
                 src="/chain-forecast.svg"
-                alt="ScriptForge"
+                alt="DuneNet"
                 className="h-12 sm:h-16 w-auto dark:invert"
               />
               <div className="leading-tight">
-                <div className="text-lg sm:text-2xl font-semibold text-slate-900 dark:text-white">ScriptForge</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Smart Script Writing Assistant</div>
+                <div className="text-lg sm:text-2xl font-semibold text-slate-900 dark:text-white">DuneNet</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Autonomous UGV Perception System</div>
               </div>
             </div>
             <span className="mb-3 sm:mb-4 inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/20 backdrop-blur-sm px-2.5 sm:px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 dark:bg-emerald-500/10">
-              AI-Powered Intelligent Script Writing Assistant
+              AI-Powered Semantic Segmentation Platform
             </span>
             <h1 className="mb-3 sm:mb-4 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-5xl xl:text-6xl">
-              Write scripts with
+              See deserts with
               <span className="ml-2 bg-linear-to-r from-emerald-500 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-                AI precision
+                pixel precision
               </span>
             </h1>
             <p className="mb-6 sm:mb-8 max-w-xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300">
-              Maintain perfect narrative continuity across long-form scripts, screenplays, and stories. Track characters, timelines, and plot threads with intelligent AI assistance that understands your creative vision.
+              Train deep learning models on digital twin desert environments to enable autonomous UGVs to understand their surroundings at pixel level — classifying terrain, vegetation, obstacles, and sky for safe off-road navigation.
             </p>
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <a
@@ -132,8 +132,8 @@ export default function Home() {
                   <Brain className="h-5 w-5 text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="text-white font-semibold text-sm ivy-font">Story Intelligence</p>
-                  <p className="text-white/80 text-xs ivy-font">247 Entities Tracked</p>
+                  <p className="text-white font-semibold text-sm ivy-font">Scene Intelligence</p>
+                  <p className="text-white/80 text-xs ivy-font">10 Semantic Classes</p>
                 </div>
               </div>
             </div>
@@ -145,8 +145,8 @@ export default function Home() {
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="text-white font-semibold text-sm ivy-font">Continuity Check</p>
-                  <p className="text-white/80 text-xs ivy-font">100% Consistency</p>
+                  <p className="text-white font-semibold text-sm ivy-font">Pixel Accuracy</p>
+                  <p className="text-white/80 text-xs ivy-font">Desert Navigation</p>
                 </div>
               </div>
             </div>
@@ -177,16 +177,16 @@ export default function Home() {
           {/* Section Header */}
           <div className="text-center mb-12 sm:mb-16">
             <Badge className="mb-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20">
-              Intelligent Writing Platform
+              Autonomous Perception Platform
             </Badge>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
               Everything you need for
               <span className="block mt-2 bg-linear-to-r from-emerald-500 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-                Perfect Story Continuity
+                Reliable UGV Navigation
               </span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              AI-powered story tracking, intelligent continuity checking, and creative assistance for screenplays, novels, and long-form narratives
+              End-to-end semantic segmentation pipeline trained on synthetic desert data — classifying every pixel so autonomous ground vehicles can identify safe paths, detect hazards, and navigate unseen terrain
             </p>
           </div>
 
@@ -208,16 +208,16 @@ export default function Home() {
               <div className="max-w-xl">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-sm border border-emerald-500/30 mb-6">
                   <Sparkles className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">AI-Powered Analytics</span>
+                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Digital Twin Training</span>
                 </div>
                 <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
-                  Contextual Story Engine
+                  Digital Twin Training Engine
                 </h3>
                 <p className="text-lg text-slate-700 dark:text-slate-200 mb-6">
-                  Maintains deep context awareness across your entire manuscript, automatically tracking characters, locations, events, and relationships as you write. Never lose track of story details again.
+                  Leverages virtual replicas of real desert environments to generate large-scale synthetic datasets with perfectly labeled segmentation masks — enabling controlled variation in terrain, lighting, vegetation, and scene composition at scale.
                 </p>
                 <button className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-semibold transition-all hover:scale-105 shadow-lg">
-                  Start Writing
+                  Explore Dataset
                 </button>
               </div>
             </div>
@@ -231,9 +231,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:bg-emerald-500 transition-colors">
                   <Brain className="h-6 w-6 text-emerald-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">Knowledge Graph Story Memory</CardTitle>
+                <CardTitle className="text-xl ivy-font">Semantic Segmentation Model</CardTitle>
                 <CardDescription className="ivy-font">
-                  Dynamic knowledge graph tracks all story entities and relationships - characters, locations, objects, events, and timelines evolve as your story progresses
+                  Deep learning model assigns a class label to every pixel in an input image — distinguishing vegetation, terrain, obstacles, rocks, logs, and sky with precise boundaries and minimal misclassification
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -244,9 +244,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 group-hover:bg-blue-500 transition-colors">
                   <Shield className="h-6 w-6 text-blue-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">Continuity Validation System</CardTitle>
+                <CardTitle className="text-xl ivy-font">Domain Generalization Engine</CardTitle>
                 <CardDescription className="ivy-font">
-                  Intelligent consistency checking detects contradictions from simple errors to complex timeline issues while recognizing intentional narrative devices
+                  Trained to avoid overfitting to familiar training scenes — learns generalized visual features that transfer reliably to new unseen desert environments and varied terrain compositions
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -257,9 +257,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500 transition-colors">
                   <Sparkles className="h-6 w-6 text-purple-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">AI Creative Assistant</CardTitle>
+                <CardTitle className="text-xl ivy-font">Structured Training Pipeline</CardTitle>
                 <CardDescription className="ivy-font">
-                  Intelligent creative support suggests scene ideas, dialogue enhancements, and plot developments that match your established style and vision
+                  Complete workflow covering preprocessing, model selection, training, validation, and iterative optimization — supporting augmentation, architectural tuning, and loss function refinement
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -270,9 +270,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
                   <Search className="h-6 w-6 text-amber-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">Intelligent Recall & Navigation</CardTitle>
+                <CardTitle className="text-xl ivy-font">Quantitative Evaluation Suite</CardTitle>
                 <CardDescription className="ivy-font">
-                  Ask questions in natural language about any story element and receive precise answers with passage references and automated summaries
+                  Performance measured via Intersection over Union (IoU), pixel accuracy, and loss trend analysis — benchmarked across experiments to reflect segmentation quality improvements
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -283,9 +283,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-4 group-hover:bg-red-500 transition-colors">
                   <FileText className="h-6 w-6 text-red-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">Multi-Format Support</CardTitle>
+                <CardTitle className="text-xl ivy-font">Multi-Class Scene Understanding</CardTitle>
                 <CardDescription className="ivy-font">
-                  Compatible with screenplays, novels, episodic scripts, and mixed formats - adapts to your writing style and genre conventions
+                  Classifies 10 environmental categories — trees, lush bushes, dry grass, dry bushes, ground clutter, flowers, logs, rocks, general landscape, and sky — for complete scene awareness
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -296,9 +296,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center mb-4 group-hover:bg-teal-500 transition-colors">
                   <Users className="h-6 w-6 text-teal-500 group-hover:text-white transition-colors" />
                 </div>
-                <CardTitle className="text-xl ivy-font">Collaboration Support</CardTitle>
+                <CardTitle className="text-xl ivy-font">Reproducible Research Pipeline</CardTitle>
                 <CardDescription className="ivy-font">
-                  Shared story knowledge base for writing teams with collaborative editing and role-based permissions for different contributors
+                  Clear documentation of model design, training workflow, and optimization strategies ensures results can be reproduced reliably — with experiment tracking and automated evaluation tools
                 </CardDescription>
               </CardHeader>
             </Card>
