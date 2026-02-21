@@ -70,7 +70,7 @@ export default function AuthPage() {
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
             <div className="h-12 w-12 rounded-full bg-linear-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">CF</span>
+              <span className="text-2xl font-bold text-white">DN</span>
             </div>
           </div>
           <CardTitle className="text-2xl text-center text-white">

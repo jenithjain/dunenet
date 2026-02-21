@@ -84,7 +84,7 @@ const ChatMessageSchema = new mongoose.Schema({
 }, { _id: false });
 
 /**
- * Campaign Schema - The Heart of ScriptForgeAI
+ * Campaign Schema - The Heart of DuneNet
  * Stores both the chat context and the resulting workflow graph
  */
 const CampaignSchema = new mongoose.Schema({
