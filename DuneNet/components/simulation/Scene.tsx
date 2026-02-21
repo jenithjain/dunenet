@@ -21,6 +21,7 @@ import GoalMarker from './GoalMarker';
 import DustParticles from './DustParticles';
 import MiniMap from './MiniMap';
 import SettingsPanel from './SettingsPanel';
+import LiveInferencePanel, { type InferenceResult } from './LiveInferencePanel';
 import {
   type SimSettings,
   DEFAULT_SETTINGS,
@@ -77,6 +78,7 @@ function RobotController({
   terrainHeightOffset,
   onReachedGoal,
   resetTrigger,
+  liveInferenceMode,
 }: {
   costmap: CostmapData;
   path: PathPoint[];
@@ -85,6 +87,7 @@ function RobotController({
   terrainHeightOffset: number;
   onReachedGoal: () => void;
   resetTrigger: number;
+  liveInferenceMode: boolean;
 }) {
   const pathIdx = useRef(0);
   const currentPos = useRef<[number, number, number]>([0, 0, 0]);
@@ -93,18 +96,31 @@ function RobotController({
 
   // Reset when path or reset trigger changes
   useEffect(() => {
-    pathIdx.current = 0;
     reached.current = false;
     if (path.length > 0) {
-      const first = path[0];
-      const [wx, wz] = gridToWorld(first.x, first.y, costmap.width, costmap.height, worldSize);
-      const wy = getTerrainHeight(wx, wz, worldSize, terrainRelief, terrainHeightOffset);
-      currentPos.current = [wx, wy + 0.6, wz];
-      robotState.position = [wx, wy + 0.6, wz];
-      robotState.rotation = 0;
-      robotState.moving = false;
+      if (liveInferenceMode) {
+        // Live inference: snap to nearest path point without teleporting
+        let minDist = Infinity;
+        let closest = 0;
+        const [rx, , rz] = robotState.position;
+        for (let i = 0; i < Math.min(path.length, 50); i++) {
+          const [wx, wz] = gridToWorld(path[i].x, path[i].y, costmap.width, costmap.height, worldSize);
+          const dist = (wx - rx) ** 2 + (wz - rz) ** 2;
+          if (dist < minDist) { minDist = dist; closest = i; }
+        }
+        pathIdx.current = closest;
+      } else {
+        pathIdx.current = 0;
+        const first = path[0];
+        const [wx, wz] = gridToWorld(first.x, first.y, costmap.width, costmap.height, worldSize);
+        const wy = getTerrainHeight(wx, wz, worldSize, terrainRelief, terrainHeightOffset);
+        currentPos.current = [wx, wy + 0.6, wz];
+        robotState.position = [wx, wy + 0.6, wz];
+        robotState.rotation = 0;
+        robotState.moving = false;
+      }
     }
-  }, [path, resetTrigger, terrainRelief, terrainHeightOffset]);
+  }, [path, resetTrigger, terrainRelief, terrainHeightOffset, liveInferenceMode]);
 
   useFrame((_, delta) => {
     if (path.length < 2 || reached.current) {
@@ -220,6 +236,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   const [showSegmentation, setShowSegmentation] = useState(false);
   const [showCostmap, setShowCostmap] = useState(false);
+
+  // ── Live inference state ──
+  const [liveInferenceEnabled, setLiveInferenceEnabled] = useState(false);
+  const [inferenceData, setInferenceData] = useState<InferenceResult | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [inferenceCount, setInferenceCount] = useState(0);
+  const [isInferencing, setIsInferencing] = useState(false);
+  const [inferenceError, setInferenceError] = useState<string | null>(null);
   const [showOverlayUi, setShowOverlayUi] = useState(true);
   const [contextLost, setContextLost] = useState(false);
   const [gpuSafeMode, setGpuSafeMode] = useState(false);
@@ -234,6 +258,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   const contextRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasListenersCleanupRef = useRef<(() => void) | null>(null);
+  const glRef = useRef<THREE.WebGLRenderer | null>(null);
+  const liveStartRef = useRef<PathPoint>({ x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) });
 
   // Merge settings patch & sync mutable store
   const updateSettings = useCallback((patch: Partial<SimSettings>) => {
@@ -285,23 +311,28 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   // Compute path when costmap or goal changes
   useEffect(() => {
     if (!costmap) return;
+    const start = liveInferenceEnabled ? liveStartRef.current : startGrid;
 
     const timer = setTimeout(() => {
-      const rawPath = astar(costmap.data, startGrid, goalGrid);
+      const rawPath = astar(costmap.data, start, goalGrid);
       if (rawPath.length > 0) {
         const smoothed = smoothPath(rawPath, 3, 0.25);
         setPath(smoothed);
-        setSimStatus(`Path found: ${rawPath.length} nodes → ${smoothed.length} smoothed. Ready.`);
+        setSimStatus(
+          liveInferenceEnabled
+            ? `Live path update: ${smoothed.length} pts`
+            : `Path found: ${rawPath.length} nodes → ${smoothed.length} smoothed. Ready.`,
+        );
         setIsRunning(true);
         setHasReachedGoal(false);
       } else {
         setPath([]);
         setSimStatus('No valid path found! Try changing the goal.');
       }
-    }, 300);
+    }, liveInferenceEnabled ? 100 : 300);
 
     return () => clearTimeout(timer);
-  }, [costmap, goalGrid, startGrid]);
+  }, [costmap, goalGrid, startGrid, liveInferenceEnabled]);
 
   const handleResetRobot = useCallback(() => {
     setResetTrigger((t) => t + 1);
@@ -332,7 +363,124 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     setSimStatus('Goal reached! ✓');
   }, []);
 
+  // ── Live Inference: toggle handler ──
+  const handleToggleLiveInference = useCallback(() => {
+    setLiveInferenceEnabled(prev => {
+      const next = !prev;
+      if (next) {
+        updateSettings({ cameraMode: 'fpv' });
+        setInferenceCount(0);
+        setInferenceData(null);
+        setInferenceError(null);
+        setCapturedImage(null);
+        const [gx, gy] = worldToGrid(
+          robotState.position[0], robotState.position[2],
+          GRID_SIZE, GRID_SIZE, WORLD_SIZE,
+        );
+        liveStartRef.current = { x: Math.round(gx), y: Math.round(gy) };
+      }
+      return next;
+    });
+  }, [updateSettings]);
+
+  // ── Live Inference: project traversability grid onto simulation costmap ──
+  const updateCostmapFromInference = useCallback((travGrid: number[][]) => {
+    setCostmap(prev => {
+      if (!prev || !travGrid?.length) return prev;
+      const newData = prev.data.map(row => [...row]);
+      const rx = robotState.position[0];
+      const rz = robotState.position[2];
+      const heading = robotState.rotation;
+      const gridRows = travGrid.length;
+      const gridCols = travGrid[0]?.length || 0;
+      const angularSpread = (50 * Math.PI) / 180;
+      const cellSize = WORLD_SIZE / GRID_SIZE;
+      const minDepth = 2;
+      const maxDepth = 16;
+
+      for (let r = 0; r < gridRows; r++) {
+        for (let c = 0; c < gridCols; c++) {
+          const aOff = (c / Math.max(1, gridCols - 1) - 0.5) * angularSpread;
+          const depth = minDepth + (1 - r / Math.max(1, gridRows - 1)) * (maxDepth - minDepth);
+          const dir = heading + aOff;
+          const fwX = -Math.cos(dir);
+          const fwZ = Math.sin(dir);
+          const wx = rx + fwX * depth * cellSize;
+          const wz = rz + fwZ * depth * cellSize;
+          const [gx, gy] = worldToGrid(wx, wz, GRID_SIZE, GRID_SIZE, WORLD_SIZE);
+          // Fill 3×3 area for smoother coverage
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = gx + dx;
+              const ny = gy + dy;
+              if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                newData[ny][nx] = travGrid[r][c];
+              }
+            }
+          }
+        }
+      }
+      return { width: prev.width, height: prev.height, data: newData };
+    });
+  }, []);
+
+  // ── Live Inference: periodic capture → API → costmap update loop ──
+  useEffect(() => {
+    if (!liveInferenceEnabled) return;
+    let busy = false;
+    let cancelled = false;
+
+    const capture = async () => {
+      if (busy || cancelled || !glRef.current) return;
+      busy = true;
+      setIsInferencing(true);
+      try {
+        const canvas = glRef.current.domElement;
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        setCapturedImage(dataUrl);
+
+        const blob = await fetch(dataUrl).then(r => r.blob());
+        const fd = new FormData();
+        fd.append('file', blob, 'fpv_capture.jpg');
+
+        const res = await fetch('http://localhost:8000/predict/sim', {
+          method: 'POST',
+          body: fd,
+        });
+        if (!res.ok) throw new Error(`API ${res.status}`);
+        const data: InferenceResult = await res.json();
+        if (cancelled) return;
+
+        setInferenceData(data);
+        setInferenceCount(c => c + 1);
+        setInferenceError(null);
+
+        // Update start position and costmap
+        const [gx, gy] = worldToGrid(
+          robotState.position[0], robotState.position[2],
+          GRID_SIZE, GRID_SIZE, WORLD_SIZE,
+        );
+        liveStartRef.current = { x: Math.round(gx), y: Math.round(gy) };
+        updateCostmapFromInference(data.traversability_grid);
+      } catch (err: any) {
+        if (!cancelled) setInferenceError(err.message || 'Inference failed');
+      } finally {
+        busy = false;
+        if (!cancelled) setIsInferencing(false);
+      }
+    };
+
+    const initTimer = setTimeout(capture, 1500);
+    const loopTimer = setInterval(capture, 5000);
+    return () => {
+      cancelled = true;
+      clearTimeout(initTimer);
+      clearInterval(loopTimer);
+    };
+  }, [liveInferenceEnabled, updateCostmapFromInference]);
+
   const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    glRef.current = gl;
     // Fresh renderer was created successfully; clear any stale recovery overlay.
     setContextLost(false);
 
@@ -434,6 +582,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           physicallyCorrectLights: true,
           powerPreference: 'default',
           failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: true,
         }}
         camera={{ fov: settings.cameraFov, near: 0.1, far: 1200, position: [26, 12, 26] }}
         dpr={gpuSafeMode ? [1, 1] : [1, 1.2]}
@@ -505,6 +654,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             terrainHeightOffset={settings.terrainHeightOffset}
             onReachedGoal={handleReachedGoal}
             resetTrigger={resetTrigger}
+            liveInferenceMode={liveInferenceEnabled}
           />
         )}
 
@@ -550,7 +700,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         {!gpuSafeMode && !hasReachedGoal && <PostProcessing bloomIntensity={settings.bloomIntensity} />}
       </Canvas>
 
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex items-center gap-2">
         <button
           onClick={() => setShowOverlayUi((v) => !v)}
           style={{
@@ -566,6 +716,43 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           }}
         >
           {showOverlayUi ? 'Hide UI' : 'Show UI'}
+        </button>
+        <button
+          onClick={handleToggleLiveInference}
+          style={{
+            background: liveInferenceEnabled
+              ? 'rgba(168,85,247,0.35)'
+              : 'rgba(0,0,0,0.55)',
+            border: `1px solid ${
+              liveInferenceEnabled
+                ? 'rgba(168,85,247,0.6)'
+                : 'rgba(255,255,255,0.14)'
+            }`,
+            color: liveInferenceEnabled ? '#c084fc' : '#e2e8f0',
+            borderRadius: 10,
+            padding: '6px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            backdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: liveInferenceEnabled ? '#a855f7' : '#64748b',
+              boxShadow: liveInferenceEnabled ? '0 0 8px #a855f7' : 'none',
+              transition: 'all 200ms',
+            }}
+          />
+          {liveInferenceEnabled ? '⚡ Inference ON' : '⚡ Inference'}
         </button>
       </div>
 
@@ -826,6 +1013,16 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       )}
         </>
       )}
+
+      {/* Live Inference Panel */}
+      <LiveInferencePanel
+        enabled={liveInferenceEnabled}
+        data={inferenceData}
+        capturedImage={capturedImage}
+        inferenceCount={inferenceCount}
+        isProcessing={isInferencing}
+        error={inferenceError}
+      />
     </div>
   );
 }

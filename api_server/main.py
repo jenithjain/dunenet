@@ -320,6 +320,160 @@ async def predict(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
+
+# ═══════════════════════════════════════════════════════════════
+#  Simulation Live Inference
+# ═══════════════════════════════════════════════════════════════
+
+class SimPredictionResponse(BaseModel):
+    segmentation_mask: str
+    traversability_map: str
+    traversability_overlay: str
+    traversability_stats: dict
+    traversability_grid: list
+    class_distribution: dict
+    inference_time_ms: float
+    dominant_class: str
+    confidence: float
+
+
+def create_traversability_grid(class_mask, grid_cols=12, grid_rows=8):
+    """Create a coarse traversability grid from the prediction mask.
+    Uses the bottom 65 % of the image (ground portion, excluding sky).
+    Returns 2-D list of costmap values: 0 = go, 5 = caution, 10 = no_go.
+    """
+    h, w = class_mask.shape
+    ground_start = int(h * 0.35)
+    ground_mask = class_mask[ground_start:, :]
+    gh, gw = ground_mask.shape
+
+    cell_h = max(1, gh // grid_rows)
+    cell_w = max(1, gw // grid_cols)
+
+    grid = []
+    for r in range(grid_rows):
+        row = []
+        for c in range(grid_cols):
+            y0 = r * cell_h
+            y1 = min((r + 1) * cell_h, gh)
+            x0 = c * cell_w
+            x1 = min((c + 1) * cell_w, gw)
+
+            cell = ground_mask[y0:y1, x0:x1]
+            if cell.size == 0:
+                row.append(0)
+                continue
+
+            go_count = caution_count = no_go_count = 0
+            for cid in range(NUM_CLASSES):
+                cnt = int((cell == cid).sum())
+                cat = TRAVERSABILITY[cid]
+                if cat == 'go':
+                    go_count += cnt
+                elif cat == 'caution':
+                    caution_count += cnt
+                elif cat == 'no_go':
+                    no_go_count += cnt
+
+            total = go_count + caution_count + no_go_count
+            if total == 0:
+                row.append(0)
+            elif no_go_count / total > 0.3:
+                row.append(10)
+            elif caution_count / total > 0.3:
+                row.append(5)
+            else:
+                row.append(0)
+        grid.append(row)
+    return grid
+
+
+@app.post("/predict/sim", response_model=SimPredictionResponse)
+async def predict_sim(file: UploadFile = File(...)):
+    """Prediction endpoint optimised for simulation live inference.
+    Returns a traversability grid suitable for direct costmap updates."""
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    import time
+    t0 = time.time()
+
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert('RGB')
+        image_np = np.array(image)
+        orig_h, orig_w = image_np.shape[:2]
+
+        transform = A.Compose([
+            A.Resize(height=IMG_SIZE, width=IMG_SIZE),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ])
+
+        aug = transform(image=image_np)
+        tensor = aug['image'].unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            use_fp16 = device.type == 'cuda'
+            with torch.amp.autocast(device_type=device.type, enabled=use_fp16):
+                outputs = model(pixel_values=tensor)
+
+            logits = F.interpolate(
+                outputs.logits,
+                size=(IMG_SIZE, IMG_SIZE),
+                mode='bilinear',
+                align_corners=False,
+            )
+
+            probs = torch.softmax(logits, dim=1).squeeze().cpu().numpy()
+            pred_mask = np.argmax(probs, axis=0).astype(np.uint8)
+            pred_mask_orig = np.array(
+                Image.fromarray(pred_mask).resize((orig_w, orig_h), Image.NEAREST)
+            )
+
+        # Visualisations
+        colored_mask = colorize_mask(pred_mask_orig)
+        trav_map = create_traversability_map(pred_mask_orig)
+
+        trav_overlay_img = image_np.copy()
+        for cid, category in TRAVERSABILITY.items():
+            region = (pred_mask_orig == cid)
+            trav_overlay_img[region] = (
+                image_np[region].astype(np.float32) * 0.4
+                + TRAV_COLORS[category].astype(np.float32) * 0.6
+            ).astype(np.uint8)
+
+        trav_stats = calculate_traversability_stats(pred_mask_orig)
+        trav_grid = create_traversability_grid(pred_mask_orig)
+
+        class_dist = {}
+        total_pixels = pred_mask_orig.size
+        for cid in range(NUM_CLASSES):
+            cnt = int((pred_mask_orig == cid).sum())
+            if cnt > 0:
+                class_dist[CLASS_NAMES[cid]] = f"{cnt / total_pixels * 100:.1f}%"
+
+        dominant = int(np.bincount(pred_mask_orig.flatten()).argmax())
+        conf = float(probs[dominant].mean())
+        elapsed = (time.time() - t0) * 1000
+
+        return {
+            "segmentation_mask": numpy_to_base64(colored_mask),
+            "traversability_map": numpy_to_base64(trav_map),
+            "traversability_overlay": numpy_to_base64(trav_overlay_img),
+            "traversability_stats": trav_stats,
+            "traversability_grid": trav_grid,
+            "class_distribution": class_dist,
+            "inference_time_ms": round(elapsed, 1),
+            "dominant_class": CLASS_NAMES[dominant],
+            "confidence": conf,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Sim prediction error: {str(e)}")
+
+
 @app.get("/model/info")
 async def model_info():
     """Get model information"""
