@@ -7,7 +7,6 @@ import {
   EffectComposer,
   Bloom,
   ToneMapping,
-  Vignette,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
@@ -119,7 +118,8 @@ function RobotController({
     const ny = getTerrainHeight(nx, nz, worldSize) + 0.6;
 
     currentPos.current = [nx, ny, nz];
-    const rot = Math.atan2(dx, dz);
+    // Rover's local "forward" is along negative-X, so use atan2(dz, -dx)
+    const rot = Math.atan2(dz, -dx);
 
     // Write directly to shared mutable state — NO setState here!
     robotState.position = [nx, ny, nz];
@@ -155,15 +155,14 @@ function UISync({
 // ── Post Processing (lightweight – no SSAO to avoid context loss) ──
 function PostProcessing() {
   return (
-    <EffectComposer multisampling={0}>
+    <EffectComposer multisampling={4}>
       <Bloom
-        intensity={0.15}
-        luminanceThreshold={0.85}
-        luminanceSmoothing={0.4}
+        intensity={0.035}
+        luminanceThreshold={0.93}
+        luminanceSmoothing={0.25}
         mipmapBlur
       />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      <Vignette offset={0.25} darkness={0.3} />
     </EffectComposer>
   );
 }
@@ -188,9 +187,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   const [showSegmentation, setShowSegmentation] = useState(false);
   const [showCostmap, setShowCostmap] = useState(false);
   const [orbitCamera, setOrbitCamera] = useState(false);
+  const [contextLost, setContextLost] = useState(false);
+  const [canvasKey, setCanvasKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasReachedGoal, setHasReachedGoal] = useState(false);
   const [simStatus, setSimStatus] = useState('Initializing...');
+
+  const contextRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasListenersCleanupRef = useRef<(() => void) | null>(null);
 
   // Goal position in grid coords
   const [goalGrid, setGoalGrid] = useState<PathPoint>({ x: GRID_SIZE - 20, y: GRID_SIZE - 20 });
@@ -267,6 +271,56 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     setSimStatus('Goal reached! ✓');
   }, []);
 
+  const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    if (canvasListenersCleanupRef.current) {
+      canvasListenersCleanupRef.current();
+      canvasListenersCleanupRef.current = null;
+    }
+
+    const canvas = gl.domElement;
+
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      console.warn('WebGL context lost – remounting renderer');
+      setContextLost(true);
+
+      if (contextRestoreTimerRef.current) {
+        clearTimeout(contextRestoreTimerRef.current);
+      }
+
+      contextRestoreTimerRef.current = setTimeout(() => {
+        setCanvasKey((k) => k + 1);
+        setContextLost(false);
+      }, 600);
+    };
+
+    const onContextRestored = () => {
+      console.info('WebGL context restored');
+      setContextLost(false);
+      gl.setSize(canvas.clientWidth, canvas.clientHeight);
+    };
+
+    canvas.addEventListener('webglcontextlost', onContextLost, false);
+    canvas.addEventListener('webglcontextrestored', onContextRestored, false);
+
+    canvasListenersCleanupRef.current = () => {
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (contextRestoreTimerRef.current) {
+        clearTimeout(contextRestoreTimerRef.current);
+      }
+      if (canvasListenersCleanupRef.current) {
+        canvasListenersCleanupRef.current();
+        canvasListenersCleanupRef.current = null;
+      }
+    };
+  }, []);
+
   // Throttled sync callback — called at ~5 Hz from UISync inside the Canvas
   const handleUISync = useCallback(
     (pos: [number, number, number], rot: number, moving: boolean) => {
@@ -281,30 +335,21 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     <div className={`relative w-full h-full ${className ?? ''}`}>
       {/* 3D Canvas */}
       <Canvas
+        key={canvasKey}
         shadows
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
+          toneMappingExposure: 0.98,
           outputColorSpace: THREE.SRGBColorSpace,
+          physicallyCorrectLights: true,
           powerPreference: 'default',
-          preserveDrawingBuffer: true,
           failIfMajorPerformanceCaveat: false,
         }}
         camera={{ fov: 50, near: 0.1, far: 1000, position: [20, 15, 20] }}
-        dpr={[1, 1.5]}
+        dpr={[1, 1.35]}
         style={{ background: '#87CEEB' }}
-        onCreated={({ gl }) => {
-          const canvas = gl.domElement;
-          canvas.addEventListener('webglcontextlost', (e) => {
-            e.preventDefault();
-            console.warn('WebGL context lost – will restore');
-          });
-          canvas.addEventListener('webglcontextrestored', () => {
-            console.info('WebGL context restored');
-            gl.setSize(canvas.clientWidth, canvas.clientHeight);
-          });
-        }}
+        onCreated={handleCanvasCreated}
       >
         <AdaptiveDpr pixelated />
         <AdaptiveEvents />
@@ -378,6 +423,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         {/* Post processing */}
         <PostProcessing />
       </Canvas>
+
+      {contextLost && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none bg-black/35 backdrop-blur-[2px]">
+          <div className="px-3 py-2 rounded-md text-xs font-mono text-white bg-black/50 border border-white/15">
+            Restoring WebGL renderer...
+          </div>
+        </div>
+      )}
 
       {/* ── Overlay UI ── */}
 

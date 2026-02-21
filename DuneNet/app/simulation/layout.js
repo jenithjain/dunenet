@@ -24,6 +24,8 @@ export default function SimulationLayout({ children }) {
             position="right"
             isFixed={true}
             logoUrl="/chain-forecast.svg"
+            showLogo={false}
+            showThemeToggle={false}
             accentColor="#22c55e"
             colors={['#0f172a', '#111827', '#1f2937']}
             menuButtonColor={menuBtnColor}

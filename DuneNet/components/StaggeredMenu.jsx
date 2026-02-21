@@ -22,6 +22,8 @@ export const StaggeredMenu = ({
   displayItemNumbering = true,
   className,
   logoUrl = '/chain-forecast.svg',
+  showLogo = true,
+  showThemeToggle = true,
   menuButtonColor = '#fff',
   openMenuButtonColor = '#fff',
   changeMenuColorOnOpen = true,
@@ -413,19 +415,20 @@ export const StaggeredMenu = ({
           className="staggered-menu-header absolute top-0 left-0 w-full flex items-center justify-between p-[2em] bg-transparent pointer-events-none z-20"
           aria-label="Main navigation header">
           <div className="flex items-center gap-3 pointer-events-auto">
-            <div
-              className="sm-logo flex items-center select-none"
-              aria-label="Logo">
-              <img
-                src={logoUrl || '/chain-forecast.svg'}
-                alt="Logo"
-                className="sm-logo-img block h-8 w-auto object-contain dark:invert"
-                draggable={false}
-                width={110}
-                height={24} />
-            </div>
-            {/* Dark mode toggle */}
-            <ThemeToggle />
+            {showLogo && (
+              <div
+                className="sm-logo flex items-center select-none"
+                aria-label="Logo">
+                <img
+                  src={logoUrl || '/chain-forecast.svg'}
+                  alt="Logo"
+                  className="sm-logo-img block h-8 w-auto object-contain dark:invert"
+                  draggable={false}
+                  width={110}
+                  height={24} />
+              </div>
+            )}
+            {showThemeToggle && <ThemeToggle />}
           </div>
 
           <button

@@ -1,8 +1,11 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import { decode as decodeJwt } from "next-auth/jwt";
 import dbConnect from "@/lib/mongodb";
 import User from "@/lib/models/User";
+
+const authSecret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
 
 export const authOptions = {
   providers: [
@@ -185,7 +188,20 @@ export const authOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 
-  secret: process.env.NEXTAUTH_SECRET
+  jwt: {
+    async decode(params) {
+      try {
+        return await decodeJwt(params);
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[next-auth] Invalid or stale JWT cookie detected. Forcing fresh session.');
+        }
+        return null;
+      }
+    },
+  },
+
+  secret: authSecret
 };
 
 const handler = NextAuth(authOptions);

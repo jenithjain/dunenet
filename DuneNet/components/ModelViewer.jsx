@@ -410,6 +410,7 @@ const ModelViewer = ({
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
+  const canvasListenersCleanupRef = useRef(null);
   const [contextLost, setContextLost] = useState(false);
   const mountKeyRef = useRef(0);
   const [mountKey, setMountKey] = useState(0);
@@ -431,12 +432,25 @@ const ModelViewer = ({
   useEffect(() => {
     if (!contextLost) return;
     const timer = setTimeout(() => {
+      if (canvasListenersCleanupRef.current) {
+        canvasListenersCleanupRef.current();
+        canvasListenersCleanupRef.current = null;
+      }
       mountKeyRef.current += 1;
       setMountKey(mountKeyRef.current);
       setContextLost(false);
     }, 1500);
     return () => clearTimeout(timer);
   }, [contextLost]);
+
+  useEffect(() => {
+    return () => {
+      if (canvasListenersCleanupRef.current) {
+        canvasListenersCleanupRef.current();
+        canvasListenersCleanupRef.current = null;
+      }
+    };
+  }, []);
 
   const initYaw = deg2rad(defaultRotationX);
   const initPitch = deg2rad(defaultRotationY);
@@ -499,17 +513,31 @@ const ModelViewer = ({
         key={mountKey}
         shadows
         frameloop="demand"
-        gl={{ preserveDrawingBuffer: true, powerPreference: 'default' }}
+        dpr={[1, 1.5]}
+        gl={{ preserveDrawingBuffer: showScreenshotButton, powerPreference: 'default' }}
         onCreated={({ gl, scene, camera }) => {
           rendererRef.current = gl;
           sceneRef.current = scene;
           cameraRef.current = camera;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.outputColorSpace = THREE.SRGBColorSpace;
-          // Listen for WebGL context loss/restore
+
+          if (canvasListenersCleanupRef.current) {
+            canvasListenersCleanupRef.current();
+            canvasListenersCleanupRef.current = null;
+          }
+
           const canvas = gl.domElement;
-          canvas.addEventListener('webglcontextlost', handleContextLost);
-          canvas.addEventListener('webglcontextrestored', handleContextRestored);
+          const onContextLost = e => handleContextLost(e);
+          const onContextRestored = () => handleContextRestored();
+
+          canvas.addEventListener('webglcontextlost', onContextLost, false);
+          canvas.addEventListener('webglcontextrestored', onContextRestored, false);
+
+          canvasListenersCleanupRef.current = () => {
+            canvas.removeEventListener('webglcontextlost', onContextLost);
+            canvas.removeEventListener('webglcontextrestored', onContextRestored);
+          };
         }}
         camera={{ fov: 50, position: [0, 0, camZ], near: 0.01, far: 100 }}
         style={{ touchAction: 'pan-y pinch-zoom' }}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
 import StaggeredMenu from "@/components/StaggeredMenu";
 import ModelViewer from "@/components/ModelViewer";
 import LaserFlow from "@/components/LaserFlow";
@@ -17,8 +16,6 @@ export default function Home() {
   const modelUrl = "/models/mini_dron_ugv.glb";
   const [menuBtnColor, setMenuBtnColor] = useState('#000000');
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [modelKey, setModelKey] = useState(Date.now());
-  const pathname = usePathname();
 
   useEffect(() => {
     // Set initial color
@@ -39,14 +36,6 @@ export default function Home() {
     
     return () => observer.disconnect();
   }, []);
-
-  // Force remount ModelViewer when returning to home page
-  useEffect(() => {
-    if (pathname === '/') {
-      // Use timestamp to force complete remount
-      setModelKey(Date.now());
-    }
-  }, [pathname]);
 
   return (
   <main className="relative min-h-screen w-full">
@@ -155,7 +144,6 @@ export default function Home() {
             <div className="rounded-2xl border border-slate-200/60 bg-white/80 p-2 sm:p-3 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
               <div className="w-full aspect-square max-w-[570px] mx-auto">
                 <ModelViewer
-                  key={modelKey}
                   url={modelUrl}
                   defaultRotationX={10}
                   minZoomDistance={1.5}

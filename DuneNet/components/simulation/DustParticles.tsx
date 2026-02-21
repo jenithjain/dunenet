@@ -14,7 +14,7 @@ interface DustParticlesProps {
  * Reads emitter position and active flag from the shared robotState.
  */
 export default function DustParticles({
-  count = 500,
+  count = 850,
 }: DustParticlesProps) {
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -29,8 +29,8 @@ export default function DustParticles({
       pos[i3 + 2] = (Math.random() - 0.5) * 150;
 
       vel[i3] = (Math.random() - 0.3) * 2; // wind direction bias
-      vel[i3 + 1] = (Math.random() - 0.5) * 0.3;
-      vel[i3 + 2] = (Math.random() - 0.5) * 1;
+      vel[i3 + 1] = (Math.random() - 0.5) * 0.16;
+      vel[i3 + 2] = (Math.random() - 0.5) * 0.75;
     }
 
     return { positions: pos, velocities: vel };
@@ -47,9 +47,9 @@ export default function DustParticles({
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
-      arr[i3] += velocities[i3] * delta * 3;
-      arr[i3 + 1] += velocities[i3 + 1] * delta * 2;
-      arr[i3 + 2] += velocities[i3 + 2] * delta * 3;
+      arr[i3] += velocities[i3] * delta * 2.2;
+      arr[i3 + 1] += velocities[i3 + 1] * delta * 1.4;
+      arr[i3 + 2] += velocities[i3 + 2] * delta * 2.1;
 
       // Reset particles that drift too far
       if (Math.abs(arr[i3]) > 100 || arr[i3 + 1] > 25 || arr[i3 + 1] < 0) {
@@ -71,13 +71,13 @@ export default function DustParticles({
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.15}
-        color="#d4b896"
+        size={0.085}
+        color="#c7ad89"
         transparent
-        opacity={0.35}
+        opacity={0.18}
         sizeAttenuation
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
+        blending={THREE.NormalBlending}
       />
     </points>
   );
