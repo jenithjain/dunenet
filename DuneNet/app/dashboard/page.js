@@ -6,6 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
+import ModelInference from "@/components/ModelInference";
+import VisualWorkflow from "@/components/VisualWorkflow";
+import SegmentationVisualizer from "@/components/SegmentationVisualizer";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart,
@@ -230,15 +233,28 @@ export default function Dashboard() {
         </div>
 
         {/* Main Charts */}
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue="segmentation" className="space-y-4">
           <TabsList className="bg-muted/50 backdrop-blur-sm">
+            <TabsTrigger value="segmentation" className="ivy-font">AI Segmentation</TabsTrigger>
+            <TabsTrigger value="visual" className="ivy-font">Visual Pipeline</TabsTrigger>
             <TabsTrigger value="overview" className="ivy-font">Training Progress</TabsTrigger>
             <TabsTrigger value="analytics" className="ivy-font">Per-Class IoU</TabsTrigger>
             <TabsTrigger value="performance" className="ivy-font">Model Quality</TabsTrigger>
             <TabsTrigger value="cashflow" className="ivy-font">Epoch Metrics</TabsTrigger>
             <TabsTrigger value="investments" className="ivy-font">Run Comparison</TabsTrigger>
             <TabsTrigger value="transactions" className="ivy-font">Experiments</TabsTrigger>
+            <TabsTrigger value="inference" className="ivy-font">Quick Inference</TabsTrigger>
           </TabsList>
+
+          {/* AI Segmentation Tab */}
+          <TabsContent value="segmentation" className="space-y-4">
+            <SegmentationVisualizer />
+          </TabsContent>
+
+          {/* Visual Pipeline Tab */}
+          <TabsContent value="visual" className="space-y-4">
+            <VisualWorkflow />
+          </TabsContent>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
@@ -715,6 +731,11 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Model Inference Tab */}
+          <TabsContent value="inference" className="space-y-4">
+            <ModelInference />
           </TabsContent>
         </Tabs>
 
