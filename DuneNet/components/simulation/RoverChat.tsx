@@ -220,7 +220,7 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
   if (!isOpen) {
     return (
       <div
-        className="fixed bottom-4 right-4 z-30 cursor-pointer"
+        className="fixed bottom-4 left-4 z-30 cursor-pointer"
         onClick={() => setIsOpen(true)}
         title="Open rover chat"
       >
@@ -232,7 +232,7 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-30 w-96 max-h-96 bg-slate-900 rounded-lg border border-emerald-500/30 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed bottom-4 left-4 z-30 w-96 max-h-96 bg-slate-900 rounded-lg border border-emerald-500/30 shadow-2xl flex flex-col overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border-b border-emerald-500/30 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">

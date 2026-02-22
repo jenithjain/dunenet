@@ -123,7 +123,7 @@ export default function LiveInferencePanel({
       style={{
         position: 'absolute',
         top: 80,
-        right: 16,
+        right: 280,
         zIndex: 15,
         width: 280,
         maxHeight: 'calc(100vh - 200px)',

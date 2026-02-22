@@ -235,6 +235,9 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
 
   // State
   const [costmap, setCostmap] = useState<CostmapData | null>(null);
+  // frozenCostmap is used ONLY for obstacle rendering — it never changes during live
+  // inference so obstacles stay static even while the path costmap is updated.
+  const [frozenCostmap, setFrozenCostmap] = useState<CostmapData | null>(null);
   const [path, setPath] = useState<PathPoint[]>([]);
   const [robotPos, setRobotPos] = useState<[number, number, number]>([0, 2, 0]);
   const [robotRot, setRobotRot] = useState(0);
@@ -242,6 +245,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   const [robotPathIdx, setRobotPathIdx] = useState(0);
   const [robotPathLength, setRobotPathLength] = useState(0);
   const [resetTrigger, setResetTrigger] = useState(0);
+
+  const [isPickingGoal, setIsPickingGoal] = useState(false);
 
   const [showSegmentation, setShowSegmentation] = useState(false);
   const [showCostmap, setShowCostmap] = useState(false);
@@ -314,6 +319,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     setSimStatus('Generating terrain costmap...');
     const cm = generateProceduralCostmap(GRID_SIZE, GRID_SIZE, settings.obstacleDensity, settings.roughDensity, 42 + densityKey);
     setCostmap(cm);
+    // Always freeze obstacles from the freshly generated costmap (not from live inference updates)
+    setFrozenCostmap(cm);
     setSimStatus('Costmap loaded. Computing path...');
   }, [densityKey, settings.obstacleDensity, settings.roughDensity]);
 
@@ -383,6 +390,11 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         setInferenceData(null);
         setInferenceError(null);
         setCapturedImage(null);
+        // Freeze the current costmap for obstacles so they stay static during inference
+        setCostmap(cur => {
+          if (cur) setFrozenCostmap(cur);
+          return cur;
+        });
         const [gx, gy] = worldToGrid(
           robotState.position[0], robotState.position[2],
           GRID_SIZE, GRID_SIZE, WORLD_SIZE,
@@ -636,10 +648,10 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           showCostmap={showOverlayUi && showCostmap}
         />
 
-        {/* Obstacles */}
-        {costmap && (
+        {/* Obstacles — always use frozenCostmap so obstacles never shift during live inference */}
+        {(frozenCostmap || costmap) && (
           <Obstacles
-            costmapData={costmap.data}
+            costmapData={(frozenCostmap ?? costmap)!.data}
             costmapWidth={GRID_SIZE}
             costmapHeight={GRID_SIZE}
             worldSize={WORLD_SIZE}
@@ -975,6 +987,25 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         >
           ⊕ Random Goal
         </button>
+
+        <button
+          onClick={() => setIsPickingGoal((v) => !v)}
+          style={{
+            background: isPickingGoal ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${isPickingGoal ? 'rgba(239,68,68,0.8)' : 'rgba(239,68,68,0.25)'}`,
+            color: isPickingGoal ? '#f87171' : '#fca5a5',
+            borderRadius: 8,
+            padding: '6px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            cursor: 'pointer',
+            transition: 'all 150ms',
+            textAlign: 'left',
+          }}
+          title="Click then tap the minimap to drop your goal"
+        >
+          {isPickingGoal ? '✛ Click minimap…' : '✛ Choose Goal'}
+        </button>
       </div>
 
       {/* Settings Panel */}
@@ -996,6 +1027,13 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           robotGridPos={robotGridPos}
           goalGridPos={goalGrid}
           path={path}
+          pickMode={isPickingGoal}
+          onPickGoal={(gx, gy) => {
+            setGoalGrid({ x: gx, y: gy });
+            setHasReachedGoal(false);
+            setSimStatus('Custom goal set. Recomputing path...');
+            setIsPickingGoal(false);
+          }}
         />
       )}
 
