@@ -1,0 +1,588 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 920" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a1a"/>
+      <stop offset="100%" style="stop-color:#1a1a3e"/>
+    </linearGradient>
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#ee5a24"/>
+    </linearGradient>
+    <linearGradient id="prepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f9ca24"/>
+      <stop offset="100%" style="stop-color:#f0932b"/>
+    </linearGradient>
+    <linearGradient id="enc1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6c5ce7"/>
+      <stop offset="100%" style="stop-color:#a29bfe"/>
+    </linearGradient>
+    <linearGradient id="enc2Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0984e3"/>
+      <stop offset="100%" style="stop-color:#74b9ff"/>
+    </linearGradient>
+    <linearGradient id="enc3Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00b894"/>
+      <stop offset="100%" style="stop-color:#55efc4"/>
+    </linearGradient>
+    <linearGradient id="enc4Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e17055"/>
+      <stop offset="100%" style="stop-color:#fab1a0"/>
+    </linearGradient>
+    <linearGradient id="decGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fd79a8"/>
+      <stop offset="100%" style="stop-color:#e84393"/>
+    </linearGradient>
+    <linearGradient id="outGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00cec9"/>
+      <stop offset="100%" style="stop-color:#81ecec"/>
+    </linearGradient>
+    <linearGradient id="dataFlowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#ff6b6b;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#ff6b6b;stop-opacity:0"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Arrow marker -->
+    <marker id="arrowWhite" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffffff" opacity="0.7"/>
+    </marker>
+
+    <!-- Animated data pulse -->
+    <circle id="pulse" r="4" fill="#ff6b6b" opacity="0.9">
+      <animate attributeName="r" values="3;5;3" dur="1s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.9;0.5;0.9" dur="1s" repeatCount="indefinite"/>
+    </circle>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="920" fill="url(#bgGrad)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.05">
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="white" stroke-width="0.5"/>
+    </pattern>
+    <rect width="1400" height="920" fill="url(#grid)"/>
+  </g>
+
+  <!-- Title -->
+  <text x="700" y="45" text-anchor="middle" fill="white" font-size="26" font-weight="bold" filter="url(#glow)">
+    SegFormer-B4 — Real-Time Inference Pipeline
+    <animate attributeName="opacity" values="0;1" dur="1s" fill="freeze"/>
+  </text>
+  <text x="700" y="70" text-anchor="middle" fill="#aaa" font-size="13">Desert Semantic Segmentation · 10 Classes · 512×512 Input</text>
+
+  <!-- ========== STAGE 1: INPUT IMAGE ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="0.3s" fill="freeze"/>
+
+    <!-- Desert image placeholder -->
+    <rect x="30" y="110" width="140" height="105" rx="8" fill="url(#inputGrad)" opacity="0.15" stroke="url(#inputGrad)" stroke-width="2"/>
+    <!-- Mini desert scene -->
+    <rect x="30" y="175" width="140" height="40" rx="0" fill="#c4a882" opacity="0.6"/>
+    <rect x="30" y="110" width="140" height="65" rx="8" fill="#87CEEB" opacity="0.4"/>
+    <circle cx="140" cy="135" r="15" fill="#f9ca24" opacity="0.6"/>
+    <!-- Rocks -->
+    <ellipse cx="60" cy="195" rx="18" ry="10" fill="#808080" opacity="0.5"/>
+    <ellipse cx="110" cy="200" rx="14" ry="8" fill="#696969" opacity="0.5"/>
+    <!-- Bush -->
+    <circle cx="85" cy="178" r="10" fill="#228B22" opacity="0.5"/>
+
+    <rect x="30" y="110" width="140" height="105" rx="8" fill="none" stroke="url(#inputGrad)" stroke-width="2">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+    </rect>
+
+    <text x="100" y="238" text-anchor="middle" fill="url(#inputGrad)" font-size="13" font-weight="bold">Input Image</text>
+    <text x="100" y="255" text-anchor="middle" fill="#aaa" font-size="10">H×W×3 (RGB)</text>
+  </g>
+
+  <!-- Arrow: Input -> Preprocess -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.4s" begin="0.8s" fill="freeze"/>
+    <line x1="175" y1="162" x2="215" y2="162" stroke="white" stroke-width="2" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <!-- Animated data pulse along arrow -->
+    <circle r="3" fill="#ff6b6b" opacity="0.8">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="1.5s">
+        <mpath href="#path1"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="path1" d="M175,162 L215,162" fill="none" stroke="none"/>
+
+  <!-- ========== STAGE 2: PREPROCESSING ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="1s" fill="freeze"/>
+    <rect x="220" y="100" width="130" height="125" rx="10" fill="url(#prepGrad)" opacity="0.12" stroke="url(#prepGrad)" stroke-width="1.5"/>
+
+    <text x="285" y="125" text-anchor="middle" fill="url(#prepGrad)" font-size="12" font-weight="bold">Preprocessing</text>
+
+    <text x="285" y="148" text-anchor="middle" fill="#ddd" font-size="9.5">Resize → 512×512</text>
+    <text x="285" y="165" text-anchor="middle" fill="#ddd" font-size="9.5">Normalize (ImageNet)</text>
+    <text x="285" y="182" text-anchor="middle" fill="#bbb" font-size="8.5">μ=[.485,.456,.406]</text>
+    <text x="285" y="196" text-anchor="middle" fill="#bbb" font-size="8.5">σ=[.229,.224,.225]</text>
+    <text x="285" y="213" text-anchor="middle" fill="#ddd" font-size="9.5">ToTensor → [1,3,512,512]</text>
+
+    <!-- Pulsing border -->
+    <rect x="220" y="100" width="130" height="125" rx="10" fill="none" stroke="url(#prepGrad)" stroke-width="1.5">
+      <animate attributeName="stroke-opacity" values="0.4;1;0.4" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <!-- Arrow: Preprocess -> Encoder -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.4s" begin="1.5s" fill="freeze"/>
+    <line x1="355" y1="162" x2="395" y2="162" stroke="white" stroke-width="2" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <circle r="3" fill="#f9ca24" opacity="0.8">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="2s">
+        <mpath href="#path2"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="path2" d="M355,162 L395,162" fill="none" stroke="none"/>
+
+  <!-- ========== STAGE 3: MiT-B4 ENCODER (4 Stages) ========== -->
+
+  <!-- Encoder title bar -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="1.8s" fill="freeze"/>
+    <rect x="400" y="85" width="560" height="28" rx="5" fill="white" opacity="0.05"/>
+    <text x="680" y="104" text-anchor="middle" fill="white" font-size="14" font-weight="bold" filter="url(#softGlow)">
+      Mix Transformer Encoder (MiT-B4) — Hierarchical Feature Extraction
+    </text>
+  </g>
+
+  <!-- Encoder Stage 1 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.2s" fill="freeze"/>
+    <rect x="400" y="118" width="125" height="200" rx="8" fill="url(#enc1Grad)" opacity="0.12" stroke="url(#enc1Grad)" stroke-width="1.5"/>
+
+    <text x="462" y="138" text-anchor="middle" fill="url(#enc1Grad)" font-size="11" font-weight="bold">Stage 1</text>
+
+    <!-- Overlap Patch Embed -->
+    <rect x="410" y="145" width="105" height="28" rx="4" fill="url(#enc1Grad)" opacity="0.25"/>
+    <text x="462" y="163" text-anchor="middle" fill="white" font-size="8.5">Overlap Patch</text>
+    <text x="462" y="163" text-anchor="middle" fill="white" font-size="8.5" dy="-8">Embed (7×7, s=4)</text>
+
+    <!-- Transformer blocks -->
+    <rect x="410" y="180" width="105" height="55" rx="4" fill="url(#enc1Grad)" opacity="0.18"/>
+    <text x="462" y="196" text-anchor="middle" fill="#ddd" font-size="8.5">3× Transformer</text>
+    <text x="462" y="209" text-anchor="middle" fill="#bbb" font-size="7.5">Efficient Self-Attn</text>
+    <text x="462" y="221" text-anchor="middle" fill="#bbb" font-size="7.5">R=8, Mix-FFN</text>
+
+    <!-- Output shape -->
+    <rect x="410" y="242" width="105" height="22" rx="4" fill="url(#enc1Grad)" opacity="0.3"/>
+    <text x="462" y="257" text-anchor="middle" fill="white" font-size="8.5" font-weight="bold">128×128×64</text>
+
+    <!-- Feature map viz -->
+    <rect x="425" y="270" width="30" height="30" rx="3" fill="url(#enc1Grad)" opacity="0.4">
+      <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="432" y="277" width="30" height="30" rx="3" fill="url(#enc1Grad)" opacity="0.3"/>
+    <rect x="439" y="284" width="30" height="30" rx="3" fill="url(#enc1Grad)" opacity="0.2"/>
+    <text x="462" y="308" text-anchor="middle" fill="#999" font-size="7">C₁ = 64</text>
+  </g>
+
+  <!-- Arrow S1 -> S2 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.6s" fill="freeze"/>
+    <line x1="528" y1="210" x2="540" y2="210" stroke="white" stroke-width="1.5" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <circle r="2.5" fill="#6c5ce7" opacity="0.8">
+      <animateMotion dur="1s" repeatCount="indefinite" begin="3s">
+        <mpath href="#pathS1S2"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="pathS1S2" d="M528,210 L540,210" fill="none" stroke="none"/>
+
+  <!-- Encoder Stage 2 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.8s" fill="freeze"/>
+    <rect x="543" y="118" width="125" height="200" rx="8" fill="url(#enc2Grad)" opacity="0.12" stroke="url(#enc2Grad)" stroke-width="1.5"/>
+
+    <text x="605" y="138" text-anchor="middle" fill="url(#enc2Grad)" font-size="11" font-weight="bold">Stage 2</text>
+
+    <rect x="553" y="145" width="105" height="28" rx="4" fill="url(#enc2Grad)" opacity="0.25"/>
+    <text x="605" y="163" text-anchor="middle" fill="white" font-size="8.5">Overlap Patch</text>
+    <text x="605" y="163" text-anchor="middle" fill="white" font-size="8.5" dy="-8">Embed (3×3, s=2)</text>
+
+    <rect x="553" y="180" width="105" height="55" rx="4" fill="url(#enc2Grad)" opacity="0.18"/>
+    <text x="605" y="196" text-anchor="middle" fill="#ddd" font-size="8.5">8× Transformer</text>
+    <text x="605" y="209" text-anchor="middle" fill="#bbb" font-size="7.5">Efficient Self-Attn</text>
+    <text x="605" y="221" text-anchor="middle" fill="#bbb" font-size="7.5">R=4, Mix-FFN</text>
+
+    <rect x="553" y="242" width="105" height="22" rx="4" fill="url(#enc2Grad)" opacity="0.3"/>
+    <text x="605" y="257" text-anchor="middle" fill="white" font-size="8.5" font-weight="bold">64×64×128</text>
+
+    <rect x="570" y="270" width="25" height="25" rx="3" fill="url(#enc2Grad)" opacity="0.4">
+      <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite" begin="0.5s"/>
+    </rect>
+    <rect x="576" y="276" width="25" height="25" rx="3" fill="url(#enc2Grad)" opacity="0.3"/>
+    <rect x="582" y="282" width="25" height="25" rx="3" fill="url(#enc2Grad)" opacity="0.2"/>
+    <text x="605" y="308" text-anchor="middle" fill="#999" font-size="7">C₂ = 128</text>
+  </g>
+
+  <!-- Arrow S2 -> S3 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.2s" fill="freeze"/>
+    <line x1="671" y1="210" x2="683" y2="210" stroke="white" stroke-width="1.5" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <circle r="2.5" fill="#0984e3" opacity="0.8">
+      <animateMotion dur="1s" repeatCount="indefinite" begin="3.5s">
+        <mpath href="#pathS2S3"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="pathS2S3" d="M671,210 L683,210" fill="none" stroke="none"/>
+
+  <!-- Encoder Stage 3 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="3.4s" fill="freeze"/>
+    <rect x="686" y="118" width="125" height="200" rx="8" fill="url(#enc3Grad)" opacity="0.12" stroke="url(#enc3Grad)" stroke-width="1.5"/>
+
+    <text x="748" y="138" text-anchor="middle" fill="url(#enc3Grad)" font-size="11" font-weight="bold">Stage 3</text>
+
+    <rect x="696" y="145" width="105" height="28" rx="4" fill="url(#enc3Grad)" opacity="0.25"/>
+    <text x="748" y="163" text-anchor="middle" fill="white" font-size="8.5">Overlap Patch</text>
+    <text x="748" y="163" text-anchor="middle" fill="white" font-size="8.5" dy="-8">Embed (3×3, s=2)</text>
+
+    <rect x="696" y="180" width="105" height="55" rx="4" fill="url(#enc3Grad)" opacity="0.18"/>
+    <text x="748" y="196" text-anchor="middle" fill="#ddd" font-size="8.5">18× Transformer</text>
+    <text x="748" y="209" text-anchor="middle" fill="#bbb" font-size="7.5">Efficient Self-Attn</text>
+    <text x="748" y="221" text-anchor="middle" fill="#bbb" font-size="7.5">R=2, Mix-FFN</text>
+
+    <rect x="696" y="242" width="105" height="22" rx="4" fill="url(#enc3Grad)" opacity="0.3"/>
+    <text x="748" y="257" text-anchor="middle" fill="white" font-size="8.5" font-weight="bold">32×32×320</text>
+
+    <rect x="715" y="270" width="20" height="20" rx="3" fill="url(#enc3Grad)" opacity="0.4">
+      <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite" begin="1s"/>
+    </rect>
+    <rect x="720" y="275" width="20" height="20" rx="3" fill="url(#enc3Grad)" opacity="0.3"/>
+    <rect x="725" y="280" width="20" height="20" rx="3" fill="url(#enc3Grad)" opacity="0.2"/>
+    <text x="748" y="308" text-anchor="middle" fill="#999" font-size="7">C₃ = 320</text>
+  </g>
+
+  <!-- Arrow S3 -> S4 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.8s" fill="freeze"/>
+    <line x1="814" y1="210" x2="826" y2="210" stroke="white" stroke-width="1.5" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <circle r="2.5" fill="#00b894" opacity="0.8">
+      <animateMotion dur="1s" repeatCount="indefinite" begin="4s">
+        <mpath href="#pathS3S4"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="pathS3S4" d="M814,210 L826,210" fill="none" stroke="none"/>
+
+  <!-- Encoder Stage 4 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="4s" fill="freeze"/>
+    <rect x="829" y="118" width="125" height="200" rx="8" fill="url(#enc4Grad)" opacity="0.12" stroke="url(#enc4Grad)" stroke-width="1.5"/>
+
+    <text x="891" y="138" text-anchor="middle" fill="url(#enc4Grad)" font-size="11" font-weight="bold">Stage 4</text>
+
+    <rect x="839" y="145" width="105" height="28" rx="4" fill="url(#enc4Grad)" opacity="0.25"/>
+    <text x="891" y="163" text-anchor="middle" fill="white" font-size="8.5">Overlap Patch</text>
+    <text x="891" y="163" text-anchor="middle" fill="white" font-size="8.5" dy="-8">Embed (3×3, s=2)</text>
+
+    <rect x="839" y="180" width="105" height="55" rx="4" fill="url(#enc4Grad)" opacity="0.18"/>
+    <text x="891" y="196" text-anchor="middle" fill="#ddd" font-size="8.5">3× Transformer</text>
+    <text x="891" y="209" text-anchor="middle" fill="#bbb" font-size="7.5">Efficient Self-Attn</text>
+    <text x="891" y="221" text-anchor="middle" fill="#bbb" font-size="7.5">R=1, Mix-FFN</text>
+
+    <rect x="839" y="242" width="105" height="22" rx="4" fill="url(#enc4Grad)" opacity="0.3"/>
+    <text x="891" y="257" text-anchor="middle" fill="white" font-size="8.5" font-weight="bold">16×16×512</text>
+
+    <rect x="860" y="270" width="15" height="15" rx="3" fill="url(#enc4Grad)" opacity="0.4">
+      <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite" begin="1.5s"/>
+    </rect>
+    <rect x="864" y="274" width="15" height="15" rx="3" fill="url(#enc4Grad)" opacity="0.3"/>
+    <rect x="868" y="278" width="15" height="15" rx="3" fill="url(#enc4Grad)" opacity="0.2"/>
+    <text x="891" y="308" text-anchor="middle" fill="#999" font-size="7">C₄ = 512</text>
+  </g>
+
+  <!-- ========== SKIP CONNECTIONS (flowing down to decoder) ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.8s" begin="4.8s" fill="freeze"/>
+
+    <!-- Vertical lines from each stage down to decoder row -->
+    <!-- S1 skip -->
+    <line x1="462" y1="320" x2="462" y2="395" stroke="url(#enc1Grad)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+    <circle r="2.5" fill="#6c5ce7">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="5.5s">
+        <mpath href="#skipPath1"/>
+      </animateMotion>
+    </circle>
+    <path id="skipPath1" d="M462,320 L462,395" fill="none" stroke="none"/>
+
+    <!-- S2 skip -->
+    <line x1="605" y1="320" x2="605" y2="395" stroke="url(#enc2Grad)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+    <circle r="2.5" fill="#0984e3">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="5.7s">
+        <mpath href="#skipPath2"/>
+      </animateMotion>
+    </circle>
+    <path id="skipPath2" d="M605,320 L605,395" fill="none" stroke="none"/>
+
+    <!-- S3 skip -->
+    <line x1="748" y1="320" x2="748" y2="395" stroke="url(#enc3Grad)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+    <circle r="2.5" fill="#00b894">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="5.9s">
+        <mpath href="#skipPath3"/>
+      </animateMotion>
+    </circle>
+    <path id="skipPath3" d="M748,320 L748,395" fill="none" stroke="none"/>
+
+    <!-- S4 skip -->
+    <line x1="891" y1="320" x2="891" y2="395" stroke="url(#enc4Grad)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+    <circle r="2.5" fill="#e17055">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="6.1s">
+        <mpath href="#skipPath4"/>
+      </animateMotion>
+    </circle>
+    <path id="skipPath4" d="M891,320 L891,395" fill="none" stroke="none"/>
+
+    <!-- Label -->
+    <text x="680" y="365" text-anchor="middle" fill="white" font-size="10" opacity="0.5" font-style="italic">Multi-scale feature maps passed to decoder</text>
+  </g>
+
+  <!-- ========== DECODER: All-MLP Decode Head ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.8s" begin="5.5s" fill="freeze"/>
+
+    <!-- Decoder background -->
+    <rect x="390" y="390" width="580" height="215" rx="12" fill="url(#decGrad)" opacity="0.08" stroke="url(#decGrad)" stroke-width="1.5"/>
+    <text x="680" y="415" text-anchor="middle" fill="url(#decGrad)" font-size="14" font-weight="bold">All-MLP Decode Head</text>
+
+    <!-- 4 MLP branches -->
+    <!-- MLP 1 -->
+    <rect x="410" y="428" width="105" height="60" rx="6" fill="url(#enc1Grad)" opacity="0.2" stroke="url(#enc1Grad)" stroke-width="1"/>
+    <text x="462" y="448" text-anchor="middle" fill="#ddd" font-size="8.5">Linear(64→256)</text>
+    <text x="462" y="462" text-anchor="middle" fill="#ddd" font-size="8.5">Upsample 4×</text>
+    <text x="462" y="476" text-anchor="middle" fill="#bbb" font-size="7.5">→ 128×128×256</text>
+
+    <!-- MLP 2 -->
+    <rect x="533" y="428" width="105" height="60" rx="6" fill="url(#enc2Grad)" opacity="0.2" stroke="url(#enc2Grad)" stroke-width="1"/>
+    <text x="585" y="448" text-anchor="middle" fill="#ddd" font-size="8.5">Linear(128→256)</text>
+    <text x="585" y="462" text-anchor="middle" fill="#ddd" font-size="8.5">Upsample 2×</text>
+    <text x="585" y="476" text-anchor="middle" fill="#bbb" font-size="7.5">→ 128×128×256</text>
+
+    <!-- MLP 3 -->
+    <rect x="656" y="428" width="105" height="60" rx="6" fill="url(#enc3Grad)" opacity="0.2" stroke="url(#enc3Grad)" stroke-width="1"/>
+    <text x="708" y="448" text-anchor="middle" fill="#ddd" font-size="8.5">Linear(320→256)</text>
+    <text x="708" y="462" text-anchor="middle" fill="#ddd" font-size="8.5">Upsample ÷</text>
+    <text x="708" y="476" text-anchor="middle" fill="#bbb" font-size="7.5">→ 128×128×256</text>
+
+    <!-- MLP 4 -->
+    <rect x="779" y="428" width="105" height="60" rx="6" fill="url(#enc4Grad)" opacity="0.2" stroke="url(#enc4Grad)" stroke-width="1"/>
+    <text x="831" y="448" text-anchor="middle" fill="#ddd" font-size="8.5">Linear(512→256)</text>
+    <text x="831" y="462" text-anchor="middle" fill="#ddd" font-size="8.5">Upsample 8×</text>
+    <text x="831" y="476" text-anchor="middle" fill="#bbb" font-size="7.5">→ 128×128×256</text>
+
+    <!-- Concat arrows converging -->
+    <line x1="462" y1="492" x2="462" y2="520" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="585" y1="492" x2="585" y2="520" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="708" y1="492" x2="708" y2="520" stroke="white" stroke-width="1" opacity="0.4"/>
+    <line x1="831" y1="492" x2="831" y2="520" stroke="white" stroke-width="1" opacity="0.4"/>
+
+    <!-- Lines converging to concat -->
+    <line x1="462" y1="520" x2="646" y2="535" stroke="white" stroke-width="1" opacity="0.3"/>
+    <line x1="585" y1="520" x2="646" y2="535" stroke="white" stroke-width="1" opacity="0.3"/>
+    <line x1="708" y1="520" x2="646" y2="535" stroke="white" stroke-width="1" opacity="0.3"/>
+    <line x1="831" y1="520" x2="646" y2="535" stroke="white" stroke-width="1" opacity="0.3"/>
+
+    <!-- Concat block -->
+    <rect x="600" y="530" width="92" height="25" rx="5" fill="url(#decGrad)" opacity="0.4"/>
+    <text x="646" y="547" text-anchor="middle" fill="white" font-size="9" font-weight="bold">Concat</text>
+
+    <!-- Fusion MLP -->
+    <line x1="646" y1="558" x2="646" y2="568" stroke="white" stroke-width="1" opacity="0.4"/>
+    <rect x="575" y="568" width="142" height="28" rx="5" fill="url(#decGrad)" opacity="0.3"/>
+    <text x="646" y="586" text-anchor="middle" fill="white" font-size="9">Linear(1024→256) + BN + ReLU</text>
+  </g>
+
+  <!-- Arrow: Decoder -> Classifier -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.4s" begin="6.5s" fill="freeze"/>
+    <line x1="646" y1="608" x2="646" y2="640" stroke="white" stroke-width="2" opacity="0.5" marker-end="url(#arrowWhite)"/>
+    <circle r="3" fill="#fd79a8" opacity="0.8">
+      <animateMotion dur="1.2s" repeatCount="indefinite" begin="7s">
+        <mpath href="#pathDecOut"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <path id="pathDecOut" d="M646,608 L646,640" fill="none" stroke="none"/>
+
+  <!-- ========== STAGE 5: CLASSIFIER + UPSAMPLE ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="7s" fill="freeze"/>
+
+    <!-- Classifier head -->
+    <rect x="540" y="645" width="212" height="55" rx="10" fill="url(#outGrad)" opacity="0.12" stroke="url(#outGrad)" stroke-width="1.5"/>
+
+    <text x="646" y="665" text-anchor="middle" fill="url(#outGrad)" font-size="11" font-weight="bold">Classification Head</text>
+    <text x="646" y="682" text-anchor="middle" fill="#ddd" font-size="9">Conv1×1(256 → 10 classes)</text>
+    <text x="646" y="694" text-anchor="middle" fill="#bbb" font-size="8">→ 128×128×10 logits</text>
+  </g>
+
+  <!-- Arrow: Classifier -> Upsample -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.4s" begin="7.5s" fill="freeze"/>
+    <line x1="646" y1="704" x2="646" y2="730" stroke="white" stroke-width="2" opacity="0.5" marker-end="url(#arrowWhite)"/>
+  </g>
+
+  <!-- Bilinear Upsample -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="7.8s" fill="freeze"/>
+    <rect x="555" y="735" width="182" height="38" rx="8" fill="white" opacity="0.08" stroke="white" stroke-width="1" stroke-opacity="0.3"/>
+    <text x="646" y="755" text-anchor="middle" fill="#ddd" font-size="10">Bilinear Upsample 4× → 512×512</text>
+    <text x="646" y="768" text-anchor="middle" fill="#bbb" font-size="8">Argmax over 10 channels</text>
+  </g>
+
+  <!-- Arrow: Upsample -> Output -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.4s" begin="8.2s" fill="freeze"/>
+    <line x1="646" y1="778" x2="646" y2="808" stroke="white" stroke-width="2" opacity="0.5" marker-end="url(#arrowWhite)"/>
+  </g>
+
+  <!-- ========== STAGE 6: OUTPUT SEGMENTATION MAP ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.8s" begin="8.5s" fill="freeze"/>
+
+    <rect x="556" y="812" width="180" height="95" rx="8" fill="url(#outGrad)" opacity="0.1" stroke="url(#outGrad)" stroke-width="2">
+      <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+    </rect>
+
+    <!-- Mini segmentation output -->
+    <rect x="580" y="820" width="60" height="45" rx="4" fill="#87CEEB" opacity="0.6"/>
+    <rect x="580" y="845" width="60" height="20" rx="0" fill="#c4a882" opacity="0.6"/>
+    <rect x="580" y="840" width="25" height="15" rx="2" fill="#228B22" opacity="0.6"/>
+    <rect x="615" y="848" width="20" height="12" rx="2" fill="#808080" opacity="0.6"/>
+    <rect x="600" y="835" width="15" height="10" rx="2" fill="#8B4513" opacity="0.5"/>
+
+    <!-- Color key samples -->
+    <rect x="650" y="822" width="8" height="8" rx="1" fill="#228B22"/>
+    <text x="662" y="830" fill="#bbb" font-size="7">Trees</text>
+    <rect x="650" y="834" width="8" height="8" rx="1" fill="#808080"/>
+    <text x="662" y="842" fill="#bbb" font-size="7">Rocks</text>
+    <rect x="650" y="846" width="8" height="8" rx="1" fill="#87CEEB"/>
+    <text x="662" y="854" fill="#bbb" font-size="7">Sky</text>
+    <rect x="650" y="858" width="8" height="8" rx="1" fill="#c4a882"/>
+    <text x="662" y="866" fill="#bbb" font-size="7">Landscape</text>
+
+    <text x="646" y="897" text-anchor="middle" fill="url(#outGrad)" font-size="12" font-weight="bold">Segmentation Map</text>
+    <text x="646" y="912" text-anchor="middle" fill="#aaa" font-size="9">512×512 · 10 classes · per-pixel</text>
+  </g>
+
+  <!-- ========== RIGHT PANEL: Key Architecture Details ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="1s" begin="9s" fill="freeze"/>
+
+    <rect x="1000" y="100" width="370" height="430" rx="12" fill="white" opacity="0.04" stroke="white" stroke-width="0.5" stroke-opacity="0.15"/>
+
+    <text x="1185" y="130" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Architecture Details</text>
+
+    <!-- Model stats -->
+    <text x="1020" y="160" fill="#f9ca24" font-size="11" font-weight="bold">Model</text>
+    <text x="1020" y="178" fill="#ddd" font-size="9.5">SegFormer-B4 (MiT-B4 encoder)</text>
+    <text x="1020" y="193" fill="#bbb" font-size="9">Total params: ~64.1M</text>
+    <text x="1020" y="208" fill="#bbb" font-size="9">Encoder: 61.4M | Decoder: 2.7M</text>
+
+    <!-- Efficient Self-Attention -->
+    <text x="1020" y="238" fill="#6c5ce7" font-size="11" font-weight="bold">Efficient Self-Attention</text>
+    <text x="1020" y="256" fill="#ddd" font-size="9.5">Sequence reduction: K,V downsampled by R</text>
+    <text x="1020" y="271" fill="#bbb" font-size="9">Stage 1: R=8 | Stage 2: R=4</text>
+    <text x="1020" y="286" fill="#bbb" font-size="9">Stage 3: R=2 | Stage 4: R=1</text>
+    <text x="1020" y="301" fill="#bbb" font-size="9">Complexity: O(N²/R) vs O(N²) standard</text>
+
+    <!-- Mix-FFN -->
+    <text x="1020" y="331" fill="#00b894" font-size="11" font-weight="bold">Mix-FFN (no positional encoding)</text>
+    <text x="1020" y="349" fill="#ddd" font-size="9.5">3×3 depth-wise conv inside FFN</text>
+    <text x="1020" y="364" fill="#bbb" font-size="9">Provides local context + position info</text>
+    <text x="1020" y="379" fill="#bbb" font-size="9">Eliminates need for positional embeddings</text>
+
+    <!-- Overlap Patch Embedding -->
+    <text x="1020" y="409" fill="#e17055" font-size="11" font-weight="bold">Overlap Patch Embedding</text>
+    <text x="1020" y="427" fill="#ddd" font-size="9.5">Overlapping patches preserve local continuity</text>
+    <text x="1020" y="442" fill="#bbb" font-size="9">Stage 1: 7×7 conv, stride 4</text>
+    <text x="1020" y="457" fill="#bbb" font-size="9">Stages 2-4: 3×3 conv, stride 2</text>
+
+    <!-- Decoder -->
+    <text x="1020" y="487" fill="#fd79a8" font-size="11" font-weight="bold">Lightweight MLP Decoder</text>
+    <text x="1020" y="505" fill="#ddd" font-size="9.5">No complex upsampling (no convT, no ASPP)</text>
+    <text x="1020" y="520" fill="#bbb" font-size="9">Just: Linear → Upsample → Concat → Linear</text>
+  </g>
+
+  <!-- ========== BOTTOM: Resolution Pyramid ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.8s" begin="9.5s" fill="freeze"/>
+
+    <rect x="1000" y="555" width="370" height="160" rx="12" fill="white" opacity="0.04" stroke="white" stroke-width="0.5" stroke-opacity="0.15"/>
+    <text x="1185" y="580" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Resolution Pyramid</text>
+
+    <!-- Bars showing resolution reduction -->
+    <rect x="1030" y="595" width="200" height="16" rx="3" fill="url(#enc1Grad)" opacity="0.4"/>
+    <text x="1240" y="607" fill="#ddd" font-size="9">128×128 (1/4)</text>
+    <text x="1038" y="607" fill="white" font-size="8" font-weight="bold">Stage 1</text>
+
+    <rect x="1030" y="618" width="150" height="16" rx="3" fill="url(#enc2Grad)" opacity="0.4"/>
+    <text x="1190" y="630" fill="#ddd" font-size="9">64×64 (1/8)</text>
+    <text x="1038" y="630" fill="white" font-size="8" font-weight="bold">Stage 2</text>
+
+    <rect x="1030" y="641" width="100" height="16" rx="3" fill="url(#enc3Grad)" opacity="0.4"/>
+    <text x="1140" y="653" fill="#ddd" font-size="9">32×32 (1/16)</text>
+    <text x="1038" y="653" fill="white" font-size="8" font-weight="bold">Stage 3</text>
+
+    <rect x="1030" y="664" width="50" height="16" rx="3" fill="url(#enc4Grad)" opacity="0.4"/>
+    <text x="1090" y="676" fill="#ddd" font-size="9">16×16 (1/32)</text>
+    <text x="1038" y="676" fill="white" font-size="8" font-weight="bold">Stage 4</text>
+
+    <text x="1185" y="705" text-anchor="middle" fill="#888" font-size="8">Input: 512×512 → progressively downsampled</text>
+  </g>
+
+  <!-- ========== BOTTOM: Training Config ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.8s" begin="10s" fill="freeze"/>
+
+    <rect x="1000" y="730" width="370" height="170" rx="12" fill="white" opacity="0.04" stroke="white" stroke-width="0.5" stroke-opacity="0.15"/>
+    <text x="1185" y="755" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Training Configuration</text>
+
+    <text x="1020" y="778" fill="#f9ca24" font-size="9">Epochs: 80 | Batch: 4 (×2 accum = eff. 8)</text>
+    <text x="1020" y="795" fill="#ddd" font-size="9">Backbone LR: 6e-5 | Decoder LR: 6e-4</text>
+    <text x="1020" y="812" fill="#ddd" font-size="9">Loss: 0.5×Focal + 0.3×Dice + 0.2×WCE</text>
+    <text x="1020" y="829" fill="#ddd" font-size="9">Optimizer: AdamW (wd=0.01)</text>
+    <text x="1020" y="846" fill="#ddd" font-size="9">Scheduler: Cosine w/ 5% warmup</text>
+    <text x="1020" y="863" fill="#ddd" font-size="9">FP16: Enabled | Early Stop: 15 patience</text>
+
+    <text x="1020" y="888" fill="#00cec9" font-size="9" font-weight="bold">Test-Time Augmentation: 3 scales × 2 flips</text>
+  </g>
+
+  <!-- ========== ANIMATED DATA FLOW PULSE (full pipeline) ========== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="1s" begin="10s" fill="freeze"/>
+    <!-- Full pipeline pulse -->
+    <circle r="5" fill="#00cec9" opacity="0.7" filter="url(#glow)">
+      <animateMotion dur="8s" repeatCount="indefinite" begin="10s">
+        <mpath href="#fullFlowPath"/>
+      </animateMotion>
+      <animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <path id="fullFlowPath" d="M100,162 L285,162 L462,162 L605,210 L748,210 L891,210 L891,395 L646,535 L646,670 L646,750 L646,850" fill="none" stroke="none"/>
+
+</svg>
