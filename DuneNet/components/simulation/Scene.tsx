@@ -111,14 +111,21 @@ function RobotController({
         }
         pathIdx.current = closest;
       } else {
-        pathIdx.current = 0;
-        const first = path[0];
-        const [wx, wz] = gridToWorld(first.x, first.y, costmap.width, costmap.height, worldSize);
+        // Find nearest point on new path from current robot position
+        // so the robot continues from where it is instead of teleporting back
+        const [rx, , rz] = robotState.position;
+        let minDist = Infinity;
+        let closest = 0;
+        for (let i = 0; i < path.length; i++) {
+          const [wx, wz] = gridToWorld(path[i].x, path[i].y, costmap.width, costmap.height, worldSize);
+          const dist = (wx - rx) ** 2 + (wz - rz) ** 2;
+          if (dist < minDist) { minDist = dist; closest = i; }
+        }
+        pathIdx.current = closest;
+        const pt = path[closest];
+        const [wx, wz] = gridToWorld(pt.x, pt.y, costmap.width, costmap.height, worldSize);
         const wy = getTerrainHeight(wx, wz, worldSize, terrainRelief, terrainHeightOffset);
         currentPos.current = [wx, wy + 0.6, wz];
-        robotState.position = [wx, wy + 0.6, wz];
-        robotState.rotation = 0;
-        robotState.moving = false;
       }
     }
   }, [path, resetTrigger, terrainRelief, terrainHeightOffset, liveInferenceMode]);
@@ -160,8 +167,24 @@ function RobotController({
     }
 
     const moveStep = Math.min(speed * delta, dist);
-    const nx = currentPos.current[0] + (dx / dist) * moveStep;
-    const nz = currentPos.current[2] + (dz / dist) * moveStep;
+    let nx = currentPos.current[0] + (dx / dist) * moveStep;
+    let nz = currentPos.current[2] + (dz / dist) * moveStep;
+
+    // ── Collision check: don't move into obstacle cells ──
+    const [cgx, cgy] = worldToGrid(nx, nz, costmap.width, costmap.height, worldSize);
+    const cellVal = costmap.data[cgy]?.[cgx] ?? 0;
+    if (cellVal >= 10) {
+      // Skip ahead to next non-obstacle path point
+      for (let skip = idx + 1; skip < path.length; skip++) {
+        const sp = path[skip];
+        const sv = costmap.data[Math.round(sp.y)]?.[Math.round(sp.x)] ?? 0;
+        if (sv < 10) {
+          pathIdx.current = skip;
+          break;
+        }
+      }
+      return; // don't move this frame
+    }
     const terrainY = getTerrainHeight(nx, nz, worldSize, terrainRelief, terrainHeightOffset) + 0.6;
     const ny = THREE.MathUtils.lerp(currentPos.current[1], terrainY, Math.min(1, delta * 6));
 
@@ -209,7 +232,7 @@ function PostProcessing({ bloomIntensity = 0.035 }: { bloomIntensity?: number })
   const { gl } = useThree();
   const attrs = gl.getContextAttributes?.();
 
-  if (!attrs || gl.isContextLost?.()) return null;
+  if (!attrs || (gl as any).isContextLost?.()) return null;
 
   return (
     <EffectComposer multisampling={0}>
@@ -265,6 +288,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [hasReachedGoal, setHasReachedGoal] = useState(false);
   const [simStatus, setSimStatus] = useState('Initializing...');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ── Simulation settings ──
   const [settings, setSettingsState] = useState<SimSettings>({ ...DEFAULT_SETTINGS });
@@ -332,7 +356,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     const timer = setTimeout(() => {
       const rawPath = astar(costmap.data, start, goalGrid);
       if (rawPath.length > 0) {
-        const smoothed = smoothPath(rawPath, 3, 0.25);
+        const smoothed = smoothPath(rawPath, 3, 0.25, costmap.data, 10);
         setPath(smoothed);
         setSimStatus(
           liveInferenceEnabled
@@ -364,8 +388,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     let gx: number, gy: number;
     let attempts = 0;
     do {
-      gx = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
-      gy = Math.floor(Math.random() * (GRID_SIZE - 20)) + 10;
+      gx = Math.floor(Math.random() * (GRID_SIZE - 4)) + 2;
+      gy = Math.floor(Math.random() * (GRID_SIZE - 4)) + 2;
       attempts++;
     } while (costmap.data[gy]?.[gx] >= 10 && attempts < 100);
 
@@ -410,6 +434,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     setCostmap(prev => {
       if (!prev || !travGrid?.length) return prev;
       const newData = prev.data.map(row => [...row]);
+      const frozen = frozenCostmap;
       const rx = robotState.position[0];
       const rz = robotState.position[2];
       const heading = robotState.rotation;
@@ -436,7 +461,15 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
               const nx = gx + dx;
               const ny = gy + dy;
               if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
-                newData[ny][nx] = travGrid[r][c];
+                // NEVER overwrite obstacle cells from the frozen costmap.
+                // Obstacles are physically placed from frozenCostmap, so the
+                // path must always treat them as impassable.
+                const frozenVal = frozen?.data[ny]?.[nx] ?? 0;
+                if (frozenVal >= 10) {
+                  newData[ny][nx] = frozenVal;  // keep obstacle
+                } else {
+                  newData[ny][nx] = Math.max(travGrid[r][c], frozenVal);
+                }
               }
             }
           }
@@ -444,7 +477,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       }
       return { width: prev.width, height: prev.height, data: newData };
     });
-  }, []);
+  }, [frozenCostmap]);
 
   // ── Live Inference: periodic capture → API → costmap update loop ──
   useEffect(() => {
@@ -603,7 +636,6 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.3,
           outputColorSpace: THREE.SRGBColorSpace,
-          physicallyCorrectLights: true,
           powerPreference: 'default',
           failIfMajorPerformanceCaveat: false,
           preserveDrawingBuffer: true,
@@ -733,6 +765,24 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       </Canvas>
 
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex items-center gap-2">
+        {/* Status indicator */}
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono backdrop-blur-md"
+          style={{
+            background: 'rgba(0,0,0,0.5)',
+            color: hasReachedGoal ? '#22c55e' : '#e2e8f0',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{
+              background: hasReachedGoal ? '#22c55e' : robotMoving ? '#3b82f6' : '#f59e0b',
+              boxShadow: `0 0 6px ${hasReachedGoal ? '#22c55e' : robotMoving ? '#3b82f6' : '#f59e0b'}`,
+            }}
+          />
+          {simStatus}
+        </div>
         <button
           onClick={() => setShowOverlayUi((v) => !v)}
           style={{
@@ -786,6 +836,44 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           />
           {liveInferenceEnabled ? '⚡ Inference ON' : '⚡ Inference'}
         </button>
+        <button
+          data-settings-toggle
+          onClick={() => setSettingsOpen((v) => !v)}
+          style={{
+            background: settingsOpen
+              ? 'rgba(59,130,246,0.35)'
+              : 'rgba(0,0,0,0.55)',
+            border: `1px solid ${
+              settingsOpen
+                ? 'rgba(59,130,246,0.6)'
+                : 'rgba(255,255,255,0.14)'
+            }`,
+            color: settingsOpen ? '#93c5fd' : '#e2e8f0',
+            borderRadius: 10,
+            padding: '6px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            backdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: settingsOpen ? '#3b82f6' : '#64748b',
+              boxShadow: settingsOpen ? '0 0 8px #3b82f6' : 'none',
+              transition: 'all 200ms',
+            }}
+          />
+          {settingsOpen ? '⚙ Settings ON' : '⚙ Settings'}
+        </button>
       </div>
 
       {showOverlayUi && contextLost && (
@@ -800,45 +888,22 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       {showOverlayUi && (
         <>
 
-      {/* Top status bar */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 pointer-events-none z-10">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono backdrop-blur-md"
-            style={{
-              background: 'rgba(0,0,0,0.5)',
-              color: hasReachedGoal ? '#22c55e' : '#e2e8f0',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            <span
-              className="inline-block w-2 h-2 rounded-full"
-              style={{
-                background: hasReachedGoal ? '#22c55e' : robotMoving ? '#3b82f6' : '#f59e0b',
-                boxShadow: `0 0 6px ${hasReachedGoal ? '#22c55e' : robotMoving ? '#3b82f6' : '#f59e0b'}`,
-              }}
-            />
-            {simStatus}
-          </div>
-        </div>
-      </div>
-
       {/* Telemetry panel */}
       <div
-        className="absolute top-14 left-4 z-10 pointer-events-none"
+        className="absolute top-3.5 left-4 z-10 pointer-events-none"
         style={{
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 12,
-          padding: '12px 16px',
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(14px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 14,
+          padding: '14px 18px',
           color: '#e2e8f0',
-          fontSize: 11,
+          fontSize: 13,
           fontFamily: 'monospace',
-          minWidth: 200,
+          minWidth: 220,
         }}
       >
-        <div style={{ marginBottom: 4, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, fontSize: 9 }}>
+        <div style={{ marginBottom: 6, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 10, fontWeight: 600 }}>
           Telemetry
         </div>
         <div className="flex justify-between gap-6">
@@ -867,25 +932,29 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         </div>
       </div>
 
-      {/* Controls panel */}
+      {/* Controls panel — positioned below telemetry */}
       <div
-        className="absolute bottom-5 left-5 z-10 flex flex-col gap-2 pointer-events-auto"
+        className="absolute top-[170px] left-4 z-10 flex flex-col gap-2.5 pointer-events-auto sim-controls-scroll"
         style={{
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 12,
-          padding: 12,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(14px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 14,
+          padding: '14px 16px',
+          maxHeight: 'calc(100vh - 300px)',
+          overflowY: 'auto',
+          minWidth: 170,
         }}
       >
         <div
           style={{
             color: '#94a3b8',
             textTransform: 'uppercase',
-            letterSpacing: 1,
-            fontSize: 9,
-            marginBottom: 4,
+            letterSpacing: 1.5,
+            fontSize: 10,
+            marginBottom: 2,
             fontFamily: 'monospace',
+            fontWeight: 600,
           }}
         >
           Controls
@@ -898,13 +967,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: showSegmentation ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
             border: `1px solid ${showSegmentation ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.1)'}`,
             color: showSegmentation ? '#22c55e' : '#e2e8f0',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
         >
           {showSegmentation ? '◉' : '○'} Segmentation
@@ -917,13 +987,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: showCostmap ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)',
             border: `1px solid ${showCostmap ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
             color: showCostmap ? '#3b82f6' : '#e2e8f0',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
         >
           {showCostmap ? '◉' : '○'} Costmap
@@ -938,19 +1009,20 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: settings.cameraMode === 'fpv' ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)',
             border: `1px solid ${settings.cameraMode === 'fpv' ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.1)'}`,
             color: settings.cameraMode === 'fpv' ? '#a855f7' : '#e2e8f0',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
         >
           {settings.cameraMode === 'fpv' ? '◉' : '○'} First Person
         </button>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
 
         <button
           onClick={handleResetRobot}
@@ -958,13 +1030,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: 'rgba(255,255,255,0.08)',
             border: '1px solid rgba(255,255,255,0.1)',
             color: '#e2e8f0',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
         >
           ↺ Reset Robot
@@ -976,13 +1049,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: 'rgba(239,68,68,0.15)',
             border: '1px solid rgba(239,68,68,0.3)',
             color: '#fca5a5',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
         >
           ⊕ Random Goal
@@ -994,13 +1068,14 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
             background: isPickingGoal ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.1)',
             border: `1px solid ${isPickingGoal ? 'rgba(239,68,68,0.8)' : 'rgba(239,68,68,0.25)'}`,
             color: isPickingGoal ? '#f87171' : '#fca5a5',
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 11,
+            borderRadius: 10,
+            padding: '8px 16px',
+            fontSize: 13,
             fontFamily: 'monospace',
             cursor: 'pointer',
             transition: 'all 150ms',
             textAlign: 'left',
+            fontWeight: 500,
           }}
           title="Click then tap the minimap to drop your goal"
         >
@@ -1012,6 +1087,8 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       <SettingsPanel
         settings={settings}
         onChange={updateSettings}
+        open={settingsOpen}
+        onToggle={setSettingsOpen}
         onRegenerateTerrain={() => {
           setDensityKey((k) => k + 1);
           handleResetRobot();
@@ -1037,10 +1114,10 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         />
       )}
 
-      {/* Legend */}
+      {/* Legend — positioned above minimap */}
       {(showSegmentation || showCostmap) && (
         <div
-          className="absolute bottom-5 right-5 z-10 mb-[200px]"
+          className="absolute bottom-[216px] right-5 z-10"
           style={{
             background: 'rgba(0,0,0,0.45)',
             backdropFilter: 'blur(12px)',
@@ -1101,6 +1178,22 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
           pathLength: robotPathLength,
         }}
       />
+
+      {/* Scoped scrollbar styles — slate theme for controls */}
+      <style>{`
+        .sim-controls-scroll::-webkit-scrollbar { width: 5px; }
+        .sim-controls-scroll::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.5);
+          border-radius: 3px;
+        }
+        .sim-controls-scroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, #64748b, #475569);
+          border-radius: 3px;
+        }
+        .sim-controls-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #94a3b8, #64748b);
+        }
+      `}</style>
     </div>
   );
 }

@@ -2,15 +2,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import { LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { LogOut, User as UserIcon } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export const StaggeredMenu = ({
@@ -522,62 +514,47 @@ export const StaggeredMenu = ({
               )}
             </ul>
 
-            {/* Profile Dropdown - Only show if user is logged in */}
-            {status === 'authenticated' && session?.user && (
-              <div
-                className="sm-auth-actions mt-auto pt-8"
-                aria-label="User actions">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-border hover:border-emerald-500/40 group">
-                      <div className="p-2 rounded-full bg-muted group-hover:bg-emerald-500/10 transition-colors">
-                        <UserIcon className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="text-sm font-semibold text-foreground">Profile</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">{session.user.email}</p>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
-                    className="w-56 bg-card/95 backdrop-blur-sm border-border/40"
-                    sideOffset={8}
+            {/* Auth section — adapts to login state */}
+            <div className="sm-auth-actions mt-auto pt-8" aria-label="User actions">
+              {status === 'authenticated' && session?.user ? (
+                /* Logged in: profile + logout */
+                <div className="flex flex-col gap-3">
+                  <Link
+                    href="/profile"
+                    onClick={() => { if (open) toggleMenu(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-border hover:border-emerald-500/40 group no-underline"
                   >
-                    <DropdownMenuLabel className="ivy-font">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {session.user.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link
-                        href="/profile"
-                        onClick={() => {
-                          if (open) toggleMenu();
-                        }}
-                        className="flex items-center cursor-pointer ivy-font"
-                      >
-                        <UserIcon className="mr-2 h-4 w-4" />
-                        <span>View Profile</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={handleLogout}
-                      className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 focus:bg-red-500/10 cursor-pointer ivy-font"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Logout</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
+                    <div className="p-2 rounded-full bg-muted group-hover:bg-emerald-500/10 transition-colors">
+                      <UserIcon className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{session.user.name || 'Profile'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 hover:border-red-500/40 transition-all duration-200 cursor-pointer text-sm font-medium"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : status !== 'loading' ? (
+                /* Not logged in: login / sign up buttons */
+                <div className="flex flex-col gap-3">
+                  <Link
+                    href="/login"
+                    onClick={() => { if (open) toggleMenu(); }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white no-underline text-sm font-semibold transition-all duration-200"
+                    style={{ background: 'var(--sm-accent, #22c55e)' }}
+                  >
+                    <UserIcon className="h-4 w-4" />
+                    <span>Login / Sign Up</span>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           </div>
         </aside>
       </div>

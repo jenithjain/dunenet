@@ -42,10 +42,8 @@ export default function DashboardLayout({ children }) {
               { label: "Home", link: "/", ariaLabel: "Go to Home" },
               { label: "Simulation", link: "/simulation", ariaLabel: "Desert Simulation" },
               { label: "Dashboard", link: "/dashboard", ariaLabel: "View Dashboard" },
-              { label: "Experiments", link: "/dashboard", ariaLabel: "Segmentation Experiments" },
-              { label: "Assistant", link: "/assistant", ariaLabel: "AI Assistant" },
-              { label: "Profile", link: "/profile", ariaLabel: "View Profile" },
             ]}
+            displaySocials={false}
           />
         </div>
       </div>

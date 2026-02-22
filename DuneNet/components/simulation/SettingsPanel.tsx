@@ -11,6 +11,8 @@ interface SettingsPanelProps {
   settings: SimSettings;
   onChange: (patch: Partial<SimSettings>) => void;
   onRegenerateTerrain?: () => void;
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
 }
 
 /* ── tiny slider ── */
@@ -81,15 +83,26 @@ export default function SettingsPanel({
   settings,
   onChange,
   onRegenerateTerrain,
+  open: controlledOpen,
+  onToggle,
 }: SettingsPanelProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(open) : v;
+    if (onToggle) onToggle(next);
+    else setInternalOpen(next);
+  };
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click — but ignore clicks on the toggle button itself
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      // Don't close if the click landed on the settings toggle button
+      if (target.closest?.('[data-settings-toggle]')) return;
+      if (panelRef.current && !panelRef.current.contains(target)) {
         setOpen(false);
       }
     };
@@ -100,53 +113,31 @@ export default function SettingsPanel({
   const s = { ...DEFAULT_SETTINGS, ...settings };
   const set = onChange;
 
+  if (!open) return null;
+
   return (
-    <div ref={panelRef} className="absolute top-14 right-4 z-20">
-      {/* Toggle button */}
-      <button
-        onClick={() => setOpen((v) => !v)}
+    <div
+      ref={panelRef}
+      className="absolute top-12 left-1/2 z-30"
+      style={{ transform: 'translateX(-50%)' }}
+    >
+      {/* Panel */}
+      <div
         style={{
-          background: open ? 'rgba(59,130,246,0.3)' : 'rgba(0,0,0,0.5)',
-          border: `1px solid ${open ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
-          color: open ? '#60a5fa' : '#e2e8f0',
-          borderRadius: 10,
-          padding: '7px 14px',
+          background: 'rgba(0,0,0,0.78)',
+          backdropFilter: 'blur(18px)',
+          border: '1px solid rgba(59,130,246,0.2)',
+          borderRadius: 14,
+          padding: '14px 18px 16px',
+          width: 320,
+          maxHeight: 'calc(100vh - 120px)',
+          overflowY: 'auto',
+          color: '#e2e8f0',
           fontSize: 11,
           fontFamily: 'monospace',
-          cursor: 'pointer',
-          backdropFilter: 'blur(12px)',
-          transition: 'all 150ms',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
         }}
+        className="sim-settings-scroll"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-        </svg>
-        Settings
-      </button>
-
-      {/* Panel */}
-      {open && (
-        <div
-          style={{
-            marginTop: 8,
-            background: 'rgba(0,0,0,0.72)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 14,
-            padding: '14px 18px 16px',
-            width: 290,
-            maxHeight: 'calc(100vh - 120px)',
-            overflowY: 'auto',
-            color: '#e2e8f0',
-            fontSize: 11,
-            fontFamily: 'monospace',
-          }}
-          className="sim-settings-scroll"
-        >
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
             Simulation Settings
           </div>
@@ -301,20 +292,23 @@ export default function SettingsPanel({
               </button>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
-      {/* Custom scrollbar styles */}
+      {/* Custom scrollbar styles — blue theme for settings */}
       <style>{`
         .sim-settings-scroll::-webkit-scrollbar {
-          width: 4px;
+          width: 5px;
         }
         .sim-settings-scroll::-webkit-scrollbar-track {
-          background: transparent;
+          background: rgba(30, 41, 59, 0.5);
+          border-radius: 3px;
         }
         .sim-settings-scroll::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.12);
-          border-radius: 2px;
+          background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+          border-radius: 3px;
+        }
+        .sim-settings-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #60a5fa, #3b82f6);
         }
         .sim-slider {
           -webkit-appearance: none;

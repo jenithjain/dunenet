@@ -174,11 +174,8 @@ export default function LoginPage() {
               { label: "Home", link: "/", ariaLabel: "Go to Home" },
               { label: "Simulation", link: "/simulation", ariaLabel: "Desert Simulation" },
               { label: "Dashboard", link: "/dashboard", ariaLabel: "View Dashboard" },
-              { label: "Assistant", link: "/assistant", ariaLabel: "AI Assistant" },
-              { label: "Features", link: "/#features", ariaLabel: "View Features" },
-              { label: "Pricing", link: "/#pricing", ariaLabel: "View Pricing" },
-              { label: "Contact", link: "/#contact", ariaLabel: "Contact us" },
             ]}
+            displaySocials={false}
           />
         </div>
       </div>

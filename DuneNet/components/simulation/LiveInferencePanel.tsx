@@ -122,11 +122,11 @@ export default function LiveInferencePanel({
     <div
       style={{
         position: 'absolute',
-        top: 80,
-        right: 280,
+        top: 100,
+        right: 16,
         zIndex: 15,
-        width: 280,
-        maxHeight: 'calc(100vh - 200px)',
+        width: 320,
+        maxHeight: 'calc(100vh - 320px)',
         overflowY: 'auto',
         background: 'rgba(0,0,0,0.65)',
         backdropFilter: 'blur(16px)',
@@ -324,13 +324,19 @@ export default function LiveInferencePanel({
         </>
       )}
 
-      {/* scoped styles */}
+      {/* scoped styles — purple theme for inference */}
       <style>{`
-        .live-inf-scroll::-webkit-scrollbar { width: 3px; }
-        .live-inf-scroll::-webkit-scrollbar-track { background: transparent; }
+        .live-inf-scroll::-webkit-scrollbar { width: 5px; }
+        .live-inf-scroll::-webkit-scrollbar-track {
+          background: rgba(30, 20, 50, 0.5);
+          border-radius: 3px;
+        }
         .live-inf-scroll::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.1);
-          border-radius: 2px;
+          background: linear-gradient(180deg, #a855f7, #7c3aed);
+          border-radius: 3px;
+        }
+        .live-inf-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #c084fc, #a855f7);
         }
         @keyframes liveInfPulse {
           0%, 100% { opacity: 1; }

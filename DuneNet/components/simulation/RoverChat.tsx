@@ -220,11 +220,11 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
   if (!isOpen) {
     return (
       <div
-        className="fixed bottom-4 left-4 z-30 cursor-pointer"
+        className="absolute bottom-4 left-4 z-20 cursor-pointer"
         onClick={() => setIsOpen(true)}
         title="Open rover chat"
       >
-        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all hover:scale-110">
+        <div className="bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all hover:scale-110">
           <MessageCircle size={24} />
         </div>
       </div>
@@ -232,30 +232,27 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-30 w-96 max-h-96 bg-slate-900 rounded-lg border border-emerald-500/30 shadow-2xl flex flex-col overflow-hidden">
+    <div className="absolute bottom-4 left-4 z-20 flex flex-col overflow-hidden" style={{ width: 300, maxHeight: 280, minHeight: 120, background: 'rgb(15, 23, 42)', borderRadius: 10, border: '1px solid rgba(16, 185, 129, 0.25)', boxShadow: '0 6px 24px rgba(0,0,0,0.4)' }}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border-b border-emerald-500/30 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <div>
-            <h3 className="text-sm font-semibold text-emerald-400">Rover Assistant</h3>
-            <p className="text-xs text-slate-400 mt-0.5">AI-powered communication</p>
-          </div>
+      <div className="border-b border-emerald-500/20 px-3 py-1.5 flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.06)' }}>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-semibold text-emerald-400">Rover Chat</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="text-slate-400 hover:text-emerald-400 transition-colors p-1"
+            className="text-slate-400 hover:text-emerald-400 transition-colors p-0.5"
             title={isMinimized ? 'Maximize' : 'Minimize'}
           >
-            {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+            {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
           </button>
           <button
             onClick={() => setIsOpen(false)}
-            className="text-slate-400 hover:text-emerald-400 transition-colors p-1"
+            className="text-slate-400 hover:text-emerald-400 transition-colors p-0.5"
             title="Close"
           >
-            <X size={16} />
+            <X size={13} />
           </button>
         </div>
       </div>
@@ -263,62 +260,31 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
       {/* Content */}
       {!isMinimized && (
         <>
-          {/* Voice Controls */}
-          <div className="bg-slate-800/50 border-b border-emerald-500/20 px-4 py-2 flex gap-2 text-xs">
-            <select
-              value={selectedGender}
-              onChange={(e) => setSelectedGender(e.target.value)}
-              className="bg-slate-700 text-slate-200 rounded px-2 py-1 border border-slate-600 focus:border-emerald-500 outline-none text-xs hover:bg-slate-600 transition-colors"
-              title="Select voice gender"
-            >
-              <option value="female">👩 Female</option>
-              <option value="male">👨 Male</option>
-            </select>
-            <select
-              value={selectedVoice}
-              onChange={(e) => setSelectedVoice(e.target.value)}
-              className="bg-slate-700 text-slate-200 rounded px-2 py-1 border border-slate-600 focus:border-emerald-500 outline-none text-xs flex-1 hover:bg-slate-600 transition-colors"
-              title="Select voice model"
-            >
-              {Object.entries(voiceConfig[selectedGender]).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-900">
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-slate-900 rover-chat-scroll">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}
               >
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg text-xs ${
+                  className={`max-w-[85%] px-2.5 py-1.5 rounded-md text-[11px] ${
                     message.sender === 'user'
                       ? 'bg-emerald-500/20 text-emerald-100 border border-emerald-500/30'
                       : 'bg-slate-800 text-slate-200 border border-slate-700'
                   }`}
                 >
-                  <p className="break-words">{message.text}</p>
+                  <p className="wrap-break-word leading-snug">{message.text}</p>
                   {message.sender === 'rover' && message.voiceUrl && (
                     <button
                       onClick={() => handlePlayVoice(message)}
-                      className="mt-2 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 text-xs"
+                      className="mt-1 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1"
                       title="Play voice response"
                     >
-                      <Volume2 size={12} />
+                      <Volume2 size={10} />
                       <span>Play</span>
                     </button>
                   )}
-                  <span className="text-xs text-slate-500 mt-1 block opacity-75">
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
                 </div>
               </div>
             ))}
@@ -338,14 +304,14 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
           </div>
 
           {/* Input */}
-          <div className="bg-slate-800/50 border-t border-emerald-500/20 px-3 py-2 flex gap-2">
+          <div className="border-t border-emerald-500/20 px-2 py-1.5 flex gap-1.5" style={{ background: 'rgba(30,41,59,0.5)' }}>
             <button
               onClick={startListening}
               disabled={isListening || isLoading}
-              className="text-slate-400 hover:text-emerald-400 disabled:opacity-50 transition-colors flex-shrink-0 p-1 rounded hover:bg-slate-700/50"
-              title={isListening ? 'Listening...' : 'Voice input (click to speak)'}
+              className="text-slate-400 hover:text-emerald-400 disabled:opacity-50 transition-colors shrink-0 p-0.5 rounded hover:bg-slate-700/50"
+              title={isListening ? 'Listening...' : 'Voice input'}
             >
-              <Mic size={18} className={isListening ? 'text-emerald-500 animate-pulse' : ''} />
+              <Mic size={14} className={isListening ? 'text-emerald-500 animate-pulse' : ''} />
             </button>
             <input
               type="text"
@@ -354,19 +320,34 @@ export default function RoverChat({ roverStatus }: RoverChatProps) {
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder="Ask the rover..."
               disabled={isLoading}
-              className="flex-1 bg-slate-700 text-slate-200 rounded px-2 py-1 text-xs border border-slate-600 focus:border-emerald-500 outline-none disabled:opacity-50 placeholder-slate-500 hover:bg-slate-600 focus:bg-slate-600 transition-colors"
+              className="flex-1 bg-slate-700 text-slate-200 rounded px-2 py-1 text-[11px] border border-slate-600 focus:border-emerald-500 outline-none disabled:opacity-50 placeholder-slate-500 hover:bg-slate-600 focus:bg-slate-600 transition-colors"
             />
             <button
               onClick={() => handleSendMessage()}
               disabled={!inputValue.trim() || isLoading}
-              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors flex-shrink-0 p-1 rounded hover:bg-emerald-500/10"
-              title="Send message (Enter)"
+              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors shrink-0 p-0.5 rounded hover:bg-emerald-500/10"
+              title="Send message"
             >
-              <Send size={18} />
+              <Send size={14} />
             </button>
           </div>
         </>
       )}
+      {/* Scoped scrollbar styles — emerald theme for chat */}
+      <style>{`
+        .rover-chat-scroll::-webkit-scrollbar { width: 5px; }
+        .rover-chat-scroll::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.8);
+          border-radius: 3px;
+        }
+        .rover-chat-scroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, #10b981, #059669);
+          border-radius: 3px;
+        }
+        .rover-chat-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #34d399, #10b981);
+        }
+      `}</style>
     </div>
   );
 }

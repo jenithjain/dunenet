@@ -210,11 +210,11 @@ export default function MiniMap({
           height: expandedSize,
           borderRadius: 16,
           overflow: 'hidden',
-          border: pickMode ? '2px solid rgba(239,68,68,0.8)' : '2px solid rgba(255,255,255,0.3)',
+          border: '2px solid rgba(255,255,255,0.3)',
           boxShadow: '0 8px 48px rgba(0,0,0,0.6)',
           background: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(8px)',
-          cursor: pickMode ? 'crosshair' : 'default',
+          cursor: 'crosshair',
         }}
       >
         {/* Grid overlay */}
@@ -259,7 +259,6 @@ export default function MiniMap({
           src={canvasDataUrl}
           alt="Minimap Expanded"
           onClick={(e) => {
-            if (!pickMode) return;
             const rect = (e.target as HTMLElement).getBoundingClientRect();
             const px = e.clientX - rect.left;
             const py = e.clientY - rect.top;
@@ -300,7 +299,7 @@ export default function MiniMap({
             justifyContent: 'space-between',
           }}
         >
-          <span style={{ fontWeight: 600 }}>{pickMode ? '✛ Click to set goal' : '⊞ Strategic Map'}</span>
+          <span style={{ fontWeight: 600 }}>{'✛ Click to set goal'}</span>
           <button
             onClick={() => setIsExpanded(false)}
             style={{

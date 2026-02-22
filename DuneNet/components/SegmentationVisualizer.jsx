@@ -234,7 +234,7 @@ export default function SegmentationVisualizer() {
 
       {/* Processing Animation */}
       {isProcessing && (
-        <Card className="border-emerald-500/50 backdrop-blur-sm bg-gradient-to-br from-emerald-500/10 to-blue-500/10 animate-pulse">
+        <Card className="border-emerald-500/50 backdrop-blur-sm bg-linear-to-br from-emerald-500/10 to-blue-500/10 animate-pulse">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -250,7 +250,7 @@ export default function SegmentationVisualizer() {
               
               <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+                  className="bg-linear-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -278,7 +278,7 @@ export default function SegmentationVisualizer() {
       {result && !isProcessing && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Success Banner */}
-          <Card className="border-emerald-500/50 backdrop-blur-sm bg-gradient-to-r from-emerald-500/10 to-green-500/10">
+          <Card className="border-emerald-500/50 backdrop-blur-sm bg-linear-to-r from-emerald-500/10 to-green-500/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-full bg-emerald-500">
@@ -316,7 +316,7 @@ export default function SegmentationVisualizer() {
                       className="w-full h-auto"
                     />
                   ) : (
-                    <div className="relative w-full aspect-video bg-gradient-to-br from-emerald-900/20 to-blue-900/20 flex items-center justify-center">
+                    <div className="relative w-full aspect-video bg-linear-to-br from-emerald-900/20 to-blue-900/20 flex items-center justify-center">
                       <Layers className="h-16 w-16 text-emerald-500 opacity-50" />
                     </div>
                   )}
@@ -344,7 +344,7 @@ export default function SegmentationVisualizer() {
                       className="w-full h-auto"
                     />
                   ) : (
-                    <div className="relative w-full aspect-video bg-gradient-to-br from-orange-900/20 to-red-900/20 flex items-center justify-center">
+                    <div className="relative w-full aspect-video bg-linear-to-br from-orange-900/20 to-red-900/20 flex items-center justify-center">
                       <Zap className="h-16 w-16 text-orange-500 opacity-50" />
                     </div>
                   )}
@@ -578,7 +578,7 @@ export default function SegmentationVisualizer() {
                               onMouseLeave={() => setHoveredSlice(null)}
                             >
                               <div 
-                                className="w-4 h-4 rounded-full flex-shrink-0 transition-transform duration-300 shadow-md" 
+                                className="w-4 h-4 rounded-full shrink-0 transition-transform duration-300 shadow-md" 
                                 style={{ 
                                   backgroundColor: SOLID_COLORS[idx % SOLID_COLORS.length],
                                   transform: isHovered ? 'scale(1.3)' : 'scale(1)'
@@ -591,7 +591,7 @@ export default function SegmentationVisualizer() {
                                   {className}
                                 </p>
                               </div>
-                              <div className="flex-shrink-0">
+                              <div className="shrink-0">
                                 <span className={`text-sm font-bold ivy-font transition-all ${
                                   isHovered ? 'text-lg text-foreground' : ''
                                 }`}>
