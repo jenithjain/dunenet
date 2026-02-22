@@ -1,14 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AdaptiveDpr, AdaptiveEvents, Preload, Stats } from '@react-three/drei';
-import {
-  EffectComposer,
-  Bloom,
-  ToneMapping,
-} from '@react-three/postprocessing';
-import { ToneMappingMode } from 'postprocessing';
+// PostProcessing imports removed — EffectComposer hijacks the render pipeline
+// and causes black screen in production builds (Next.js 16 + Turbopack).
 import * as THREE from 'three';
 
 import Terrain from './Terrain';
@@ -223,24 +219,12 @@ function UISync({
   return null;
 }
 
-// ── Post Processing (lightweight – no SSAO to avoid context loss) ──
+// ── Post Processing (disabled in production to prevent black screen) ──
 function PostProcessing({ bloomIntensity = 0.035 }: { bloomIntensity?: number }) {
-  const { gl } = useThree();
-  const attrs = gl.getContextAttributes?.();
-
-  if (!attrs || (gl as any).isContextLost?.()) return null;
-
-  return (
-    <EffectComposer multisampling={0}>
-      <Bloom
-        intensity={bloomIntensity}
-        luminanceThreshold={0.93}
-        luminanceSmoothing={0.25}
-        mipmapBlur
-      />
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-    </EffectComposer>
-  );
+  // PostProcessing EffectComposer takes over the entire render pipeline.
+  // If it fails (common with ESM bundling in production), the screen goes black.
+  // Disabled for reliability — Three.js built-in tone mapping handles visuals.
+  return null;
 }
 
 // ── Main Scene ──
@@ -279,7 +263,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   const [inferenceError, setInferenceError] = useState<string | null>(null);
   const [showOverlayUi, setShowOverlayUi] = useState(true);
   const [contextLost, setContextLost] = useState(false);
-  const [gpuSafeMode, setGpuSafeMode] = useState(false);
+  const [gpuSafeMode, setGpuSafeMode] = useState(true);
   const [canvasKey, setCanvasKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasReachedGoal, setHasReachedGoal] = useState(false);
@@ -656,36 +640,50 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         <AdaptiveEvents />
         {!gpuSafeMode && <Preload all />}
 
-        {/* Lighting */}
-        <Lighting
-          sunPosition={sunPos}
-          sunIntensity={settings.sunIntensity}
-          lightSourceBrightness={settings.lightSourceBrightness}
-          ambientIntensity={settings.ambientIntensity}
-          fogDensity={settings.fogDensity}
-          fogColor={settings.fogColor}
-          skyTurbidity={settings.skyTurbidity}
-          skyRayleigh={settings.skyRayleigh}
-          shadowRes={settings.shadowRes}
-          shadowRadius={settings.shadowRadius}
-          shadowBias={settings.shadowBias}
-          shadowNormalBias={settings.shadowNormalBias}
-          shadowCameraSize={settings.shadowCameraSize}
-          shadowFar={settings.shadowFar}
-        />
+        {/* Lighting — Suspense for Environment HDR loading */}
+        <Suspense fallback={
+          <>
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[105, 58, 32]} intensity={2} />
+          </>
+        }>
+          <Lighting
+            sunPosition={sunPos}
+            sunIntensity={settings.sunIntensity}
+            lightSourceBrightness={settings.lightSourceBrightness}
+            ambientIntensity={settings.ambientIntensity}
+            fogDensity={settings.fogDensity}
+            fogColor={settings.fogColor}
+            skyTurbidity={settings.skyTurbidity}
+            skyRayleigh={settings.skyRayleigh}
+            shadowRes={settings.shadowRes}
+            shadowRadius={settings.shadowRadius}
+            shadowBias={settings.shadowBias}
+            shadowNormalBias={settings.shadowNormalBias}
+            shadowCameraSize={settings.shadowCameraSize}
+            shadowFar={settings.shadowFar}
+          />
+        </Suspense>
 
-        {/* Terrain */}
-        <Terrain
-          size={WORLD_SIZE}
-          segments={settings.terrainSegments}
-          terrainRelief={settings.terrainRelief}
-          terrainHeightOffset={settings.terrainHeightOffset}
-          costmapData={costmap?.data ?? null}
-          costmapWidth={GRID_SIZE}
-          costmapHeight={GRID_SIZE}
-          showSegmentation={showOverlayUi && showSegmentation}
-          showCostmap={showOverlayUi && showCostmap}
-        />
+        {/* Terrain — Suspense boundary for texture loading */}
+        <Suspense fallback={
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+            <planeGeometry args={[WORLD_SIZE, WORLD_SIZE, 64, 64]} />
+            <meshStandardMaterial color="#c8a071" roughness={0.9} />
+          </mesh>
+        }>
+          <Terrain
+            size={WORLD_SIZE}
+            segments={settings.terrainSegments}
+            terrainRelief={settings.terrainRelief}
+            terrainHeightOffset={settings.terrainHeightOffset}
+            costmapData={costmap?.data ?? null}
+            costmapWidth={GRID_SIZE}
+            costmapHeight={GRID_SIZE}
+            showSegmentation={showOverlayUi && showSegmentation}
+            showCostmap={showOverlayUi && showCostmap}
+          />
+        </Suspense>
 
         {/* Obstacles — always use frozenCostmap so obstacles never shift during live inference */}
         {(frozenCostmap || costmap) && (
