@@ -3,17 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
 const ELEVEN_LABS_API_URL = 'https://api.elevenlabs.io/v1';
 
-// ElevenLabs Voice IDs (official preset voices)
+// ElevenLabs Voice IDs (real preset voices)
 const voiceIds: Record<string, string> = {
   // Female voices
-  nova: '79a125e8-cd45-4c13-8a67-188112f4dd22',
-  alloy: '293f3e7b-0ffb-47ab-8f43-08f9e45cfd5c',
-  echo: '21m00Tcm4TlvDq3XmeFe',
-  
-  // Male voices  
-  onyx: '5c42302c-0a38-416d-9e8b-a46f64402619',
-  fable: 'ed4fdf5f-76d6-4ba6-8bfb-2eda403e8f5c',
-  shimmer: '9b69d999-d5a6-408c-a97e-85de90f0875a',
+  nova: 'EXAVITQu4vr4xnSDxMaL',    // Bella
+  alloy: 'MF3mGyEYCl7XYWbV9V6O',   // Elli
+  echo: '21m00Tcm4TlvDq8XmeFe',    // Rachel
+
+  // Male voices
+  onyx: 'VR6AewLTigWG4xSOukaG',    // Arnold
+  fable: 'pNInz6obpgDQGcFmaJgB',   // Adam
+  shimmer: 'yoZ06aMxZJJ28mfd3POQ',  // Sam
 };
 
 export async function POST(request: NextRequest) {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           text: text.trim(),
-          model_id: 'eleven_monolingual_v1',
+          model_id: 'eleven_turbo_v2_5',
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,
