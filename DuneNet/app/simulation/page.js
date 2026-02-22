@@ -1,5 +1,6 @@
 'use client';
 
+import React, { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamic import to avoid SSR issues with Three.js
@@ -27,6 +28,45 @@ const SimulationScene = dynamic(
   }
 );
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Simulation Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <div className="text-center text-white/60 font-mono">
+            <p className="text-red-400 mb-2">Failed to load simulation</p>
+            <p className="text-xs">{this.state.error?.message}</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function SimulationPage() {
-  return <SimulationScene className="w-full h-full" />;
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <div className="text-white/60 text-sm font-mono">Loading 3D Engine...</div>
+        </div>
+      }>
+        <SimulationScene className="w-full h-full" />
+      </Suspense>
+    </ErrorBoundary>
+  );
 }
