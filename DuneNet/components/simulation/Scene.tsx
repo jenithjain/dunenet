@@ -482,7 +482,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
       setIsInferencing(true);
       try {
         const canvas = glRef.current.domElement;
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
         setCapturedImage(dataUrl);
 
         const blob = await fetch(dataUrl).then(r => r.blob());
@@ -517,7 +517,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
     };
 
     const initTimer = setTimeout(capture, 1500);
-    const loopTimer = setInterval(capture, 5000);
+    const loopTimer = setInterval(capture, 8000);
     return () => {
       cancelled = true;
       clearTimeout(initTimer);
