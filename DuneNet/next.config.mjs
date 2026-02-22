@@ -10,6 +10,8 @@ const nextConfig = {
     'three-stdlib',
     'postprocessing',
   ],
+  // Enable Turbopack explicitly (Next.js 16 default)
+  turbopack: {},
   webpack: (config) => {
     config.externals.push({
       'utf-8-validate': 'commonjs utf-8-validate',
