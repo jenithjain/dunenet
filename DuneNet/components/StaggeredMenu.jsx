@@ -1,4 +1,4 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
@@ -27,6 +27,7 @@ export const StaggeredMenu = ({
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const openRef = useRef(false);
+  const [mounted, setMounted] = useState(false);
 
   const panelRef = useRef(null);
   const preLayersRef = useRef(null);
@@ -82,6 +83,10 @@ export const StaggeredMenu = ({
     });
     return () => ctx.revert();
   }, [menuButtonColor, position]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close menu when clicking outside
   useLayoutEffect(() => {
@@ -514,9 +519,9 @@ export const StaggeredMenu = ({
               )}
             </ul>
 
-            {/* Auth section — adapts to login state */}
+            {/* Auth section — render only after mount to avoid hydration mismatch */}
             <div className="sm-auth-actions mt-auto pt-8" aria-label="User actions">
-              {status === 'authenticated' && session?.user ? (
+              {!mounted ? null : status === 'authenticated' && session?.user ? (
                 /* Logged in: profile + logout */
                 <div className="flex flex-col gap-3">
                   <Link

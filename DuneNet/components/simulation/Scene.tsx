@@ -90,50 +90,46 @@ function RobotController({
   resetTrigger: number;
   liveInferenceMode: boolean;
 }) {
-  const pathIdx = useRef(0);
+  const pathIdx = useRef({ index: 0, lastReset: resetTrigger });
   const currentPos = useRef<[number, number, number]>([0, 0, 0]);
   const targetPos = useRef<[number, number, number]>([0, 0, 0]);
   const reached = useRef(false);
 
-  // Reset when path or reset trigger changes
+  // Re-sync when path or reset trigger changes
   useEffect(() => {
+    const didReset = resetTrigger !== pathIdx.current.lastReset;
+    pathIdx.current.lastReset = resetTrigger;
     reached.current = false;
     if (path.length > 0) {
-      if (liveInferenceMode) {
-        // Live inference: snap to nearest path point without teleporting
-        let minDist = Infinity;
-        let closest = 0;
-        const [rx, , rz] = robotState.position;
-        for (let i = 0; i < Math.min(path.length, 50); i++) {
-          const [wx, wz] = gridToWorld(path[i].x, path[i].y, costmap.width, costmap.height, worldSize);
-          const dist = (wx - rx) ** 2 + (wz - rz) ** 2;
-          if (dist < minDist) { minDist = dist; closest = i; }
-        }
-        pathIdx.current = closest;
-      } else {
-        // Find nearest point on new path from current robot position
-        // so the robot continues from where it is instead of teleporting back
-        const [rx, , rz] = robotState.position;
-        let minDist = Infinity;
-        let closest = 0;
-        for (let i = 0; i < path.length; i++) {
-          const [wx, wz] = gridToWorld(path[i].x, path[i].y, costmap.width, costmap.height, worldSize);
-          const dist = (wx - rx) ** 2 + (wz - rz) ** 2;
-          if (dist < minDist) { minDist = dist; closest = i; }
-        }
-        pathIdx.current = closest;
-        const pt = path[closest];
-        const [wx, wz] = gridToWorld(pt.x, pt.y, costmap.width, costmap.height, worldSize);
+      if (didReset) {
+        const first = path[0];
+        const [wx, wz] = gridToWorld(first.x, first.y, costmap.width, costmap.height, worldSize);
         const wy = getTerrainHeight(wx, wz, worldSize, terrainRelief, terrainHeightOffset);
         currentPos.current = [wx, wy + 0.6, wz];
+        robotState.position = [wx, wy + 0.6, wz];
+        pathIdx.current.index = 0;
+        return;
       }
+
+      // Continue from current position when goal/path changes
+      const [rx, , rz] = robotState.position;
+      let minDist = Infinity;
+      let closest = 0;
+      const limit = liveInferenceMode ? Math.min(path.length, 50) : path.length;
+      for (let i = 0; i < limit; i++) {
+        const [wx, wz] = gridToWorld(path[i].x, path[i].y, costmap.width, costmap.height, worldSize);
+        const dist = (wx - rx) ** 2 + (wz - rz) ** 2;
+        if (dist < minDist) { minDist = dist; closest = i; }
+      }
+      pathIdx.current.index = closest;
+      currentPos.current = [rx, robotState.position[1], rz];
     }
   }, [path, resetTrigger, terrainRelief, terrainHeightOffset, liveInferenceMode]);
 
   useFrame((_, delta) => {
     if (path.length < 2 || reached.current) {
       robotState.moving = false;
-      robotState.pathIdx = pathIdx.current;
+      robotState.pathIdx = pathIdx.current.index;
       robotState.pathLength = path.length;
       return;
     }
@@ -141,7 +137,7 @@ function RobotController({
     // Move smoothly along path points
     const speed = simSettings.robotSpeed;
 
-    let idx = pathIdx.current;
+    let idx = pathIdx.current.index;
     if (idx >= path.length - 1) {
       reached.current = true;
       robotState.moving = false;
@@ -162,7 +158,7 @@ function RobotController({
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     if (dist < 0.35) {
-      pathIdx.current = Math.min(idx + 1, path.length - 1);
+      pathIdx.current.index = Math.min(idx + 1, path.length - 1);
       return;
     }
 
@@ -179,7 +175,7 @@ function RobotController({
         const sp = path[skip];
         const sv = costmap.data[Math.round(sp.y)]?.[Math.round(sp.x)] ?? 0;
         if (sv < 10) {
-          pathIdx.current = skip;
+          pathIdx.current.index = skip;
           break;
         }
       }
@@ -196,7 +192,7 @@ function RobotController({
     robotState.position = [nx, ny, nz];
     robotState.rotation = rot;
     robotState.moving = true;
-    robotState.pathIdx = pathIdx.current;
+    robotState.pathIdx = pathIdx.current.index;
     robotState.pathLength = path.length;
   });
 
@@ -351,7 +347,18 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
   // Compute path when costmap or goal changes
   useEffect(() => {
     if (!costmap) return;
-    const start = liveInferenceEnabled ? liveStartRef.current : startGrid;
+    const start = liveInferenceEnabled
+      ? liveStartRef.current
+      : (() => {
+          const [gx, gy] = worldToGrid(
+            robotState.position[0],
+            robotState.position[2],
+            GRID_SIZE,
+            GRID_SIZE,
+            WORLD_SIZE,
+          );
+          return { x: Math.round(gx), y: Math.round(gy) };
+        })();
 
     const timer = setTimeout(() => {
       const rawPath = astar(costmap.data, start, goalGrid);
