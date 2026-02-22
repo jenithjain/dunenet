@@ -498,7 +498,7 @@ export default function SimulationScene({ className }: SimulationSceneProps) {
         const fd = new FormData();
         fd.append('file', blob, 'fpv_capture.jpg');
 
-        const res = await fetch('http://localhost:8000/predict/sim', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/predict/sim`, {
           method: 'POST',
           body: fd,
         });

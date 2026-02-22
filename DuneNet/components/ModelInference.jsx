@@ -43,7 +43,7 @@ export default function ModelInference() {
     formData.append('file', selectedFile);
 
     try {
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/predict`, {
         method: 'POST',
         body: formData,
       });
@@ -181,8 +181,14 @@ export default function ModelInference() {
 
         {/* Info */}
         <div className="text-xs text-muted-foreground ivy-font space-y-1">
-          <p>• Make sure the FastAPI server is running on port 8000</p>
-          <p>• Start server: <code className="bg-muted px-1 py-0.5 rounded">python api_server/main.py</code></p>
+          {process.env.NEXT_PUBLIC_API_URL ? (
+            <p>• Using production API: {process.env.NEXT_PUBLIC_API_URL}</p>
+          ) : (
+            <>
+              <p>• Make sure the FastAPI server is running on port 8000</p>
+              <p>• Start server: <code className="bg-muted px-1 py-0.5 rounded">python api_server/main.py</code></p>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

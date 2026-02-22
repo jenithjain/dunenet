@@ -130,7 +130,7 @@ export default function VisualWorkflow() {
 
   const checkApiStatus = async () => {
     try {
-      const response = await fetch('http://localhost:8000/');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/`);
       if (response.ok) {
         const data = await response.json();
         setApiStatus(data.model_loaded ? 'ready' : 'no-model');
@@ -439,7 +439,7 @@ export default function VisualWorkflow() {
         )
       );
 
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/predict`, {
         method: 'POST',
         body: formData,
       });
@@ -683,7 +683,7 @@ export default function VisualWorkflow() {
                   API Server Connected
                 </p>
                 <Badge variant="outline" className="ml-auto">
-                  http://localhost:8000
+                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
                 </Badge>
               </div>
             </div>

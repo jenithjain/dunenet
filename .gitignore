@@ -102,3 +102,6 @@ api_server/models/*.pth
 # Runtime-generated images/files
 DuneNet/public/tmp/
 DuneNet/public/tmp/**
+
+# HF Space deployment folder (separate repo)
+hf-space-deploy/

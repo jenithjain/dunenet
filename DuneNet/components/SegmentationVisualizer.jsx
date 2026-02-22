@@ -103,7 +103,7 @@ export default function SegmentationVisualizer() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/predict`, {
         method: 'POST',
         body: formData,
       });
