@@ -765,29 +765,13 @@ export default function VisualWorkflow() {
       <Card className="border-border/40 backdrop-blur-sm bg-card/50">
         <CardContent className="p-0">
           <div style={{ height: '600px' }}>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              nodeTypes={nodeTypes}
-              fitView
-              className="bg-background"
-            >
-              <Controls />
-              <MiniMap 
-                nodeColor={(node) => {
-                  switch (node.data.status) {
-                    case 'success': return '#10b981';
-                    case 'error': return '#ef4444';
-                    case 'processing': return '#eab308';
-                    default: return '#6b7280';
-                  }
-                }}
+            <div className="w-full h-full flex items-center justify-center bg-black/40">
+              <img
+                src="/segformer_architecture_flow.svg"
+                alt="SegFormer-B4 inference pipeline"
+                className="w-full h-full object-contain"
               />
-              <Background variant="dots" gap={12} size={1} />
-            </ReactFlow>
+            </div>
           </div>
         </CardContent>
       </Card>
