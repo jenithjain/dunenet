@@ -1,4 +1,4 @@
-# 🚀 DuneNet Model API
+# 🚀 DuneNet Model
 
 Complete FastAPI server with Next.js dashboard integration featuring an interactive visual workflow system for your PyTorch perception model.
 
